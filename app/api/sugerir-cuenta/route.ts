@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 type SugerirCuentaBody = {
   proveedor?: string;
   concepto?: string;
-  total?: string;
 };
 
 export async function POST(request: Request) {
@@ -19,18 +18,20 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as SugerirCuentaBody;
   } catch {
-    return NextResponse.json({ error: "JSON inválido." }, { status: 400 });
+    return NextResponse.json({ error: "JSON inválido." }, { status: 500 });
   }
 
-  const { proveedor, concepto, total } = body;
-  if (!proveedor || !concepto || !total) {
+  const proveedor = body.proveedor?.trim();
+  const concepto = body.concepto?.trim();
+
+  if (!proveedor || !concepto) {
     return NextResponse.json(
-      { error: "proveedor, concepto y total son requeridos." },
-      { status: 400 },
+      { error: "proveedor y concepto son requeridos." },
+      { status: 500 },
     );
   }
 
-  const prompt = `Eres un contador mexicano experto. Basándote en este movimiento contable, sugiere UNA sola cuenta contable del catálogo SAT. Responde SOLO con el número y nombre de cuenta, ejemplo: '602-001 Combustibles y lubricantes'. Proveedor: ${proveedor}. Concepto: ${concepto}. Total: ${total}`;
+  const prompt = `Eres un contador mexicano experto. Sugiere UNA cuenta contable del catálogo SAT para este movimiento. Responde SOLO con el número y nombre de la cuenta, ejemplo: '602-001 Combustibles'. Proveedor: ${proveedor}. Concepto: ${concepto}`;
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
       const errorBody = await response.text();
       return NextResponse.json(
         { error: `Error de Anthropic: ${errorBody}` },
-        { status: response.status },
+        { status: 500 },
       );
     }
 
@@ -59,11 +60,14 @@ export async function POST(request: Request) {
       content?: Array<{ type: string; text?: string }>;
     };
 
-    const cuenta = data.content?.find((block) => block.type === "text")?.text?.trim();
+    const cuenta = data.content
+      ?.find((block) => block.type === "text")
+      ?.text?.trim();
+
     if (!cuenta) {
       return NextResponse.json(
         { error: "No se recibió una sugerencia válida." },
-        { status: 502 },
+        { status: 500 },
       );
     }
 

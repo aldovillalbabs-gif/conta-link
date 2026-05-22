@@ -19,7 +19,7 @@ type FacturaRow = {
   cuentaContable: string;
 };
 
-const ANALIZANDO_CUENTA = "Analizando...";
+const SUGIRIENDO_CUENTA = "Sugiriendo...";
 
 function readCfdiValue(element: Element, name: string): string {
   const attr = element.getAttribute(name);
@@ -193,8 +193,8 @@ export default function SubirPage() {
   );
 
   const solicitarSugerenciaCuenta = useCallback(
-    async (rowId: string, proveedor: string, concepto: string, total: string) => {
-      actualizarCuentaContable(rowId, ANALIZANDO_CUENTA);
+    async (rowId: string, proveedor: string, concepto: string) => {
+      actualizarCuentaContable(rowId, SUGIRIENDO_CUENTA);
 
       const proveedorTrim = proveedor.trim();
       const conceptoTrim = concepto.trim();
@@ -202,15 +202,11 @@ export default function SubirPage() {
         conceptoTrim && conceptoTrim !== "Sin concepto"
           ? conceptoTrim
           : proveedorTrim;
-      const totalTrim = total.trim();
 
       const payload = {
         proveedor: proveedorTrim,
         concepto: conceptoFinal,
-        total: totalTrim,
       };
-
-      console.log("[sugerir-cuenta] Enviando:", { rowId, ...payload });
 
       try {
         const response = await fetch("/api/sugerir-cuenta", {
@@ -221,17 +217,11 @@ export default function SubirPage() {
 
         if (response.ok) {
           const data = (await response.json()) as { cuenta?: string };
-          console.log("[sugerir-cuenta] Respuesta:", { rowId, data });
           actualizarCuentaContable(rowId, data.cuenta?.trim() ?? "");
         } else {
-          console.log("[sugerir-cuenta] Error:", {
-            rowId,
-            status: response.status,
-          });
           actualizarCuentaContable(rowId, "");
         }
-      } catch (err) {
-        console.log("[sugerir-cuenta] Error:", err);
+      } catch {
         actualizarCuentaContable(rowId, "");
       }
     },
@@ -271,12 +261,7 @@ export default function SubirPage() {
     if (newRows.length > 0) {
       setFacturas((prev) => [...prev, ...newRows]);
       for (const row of newRows) {
-        void solicitarSugerenciaCuenta(
-          row.id,
-          row.proveedor,
-          row.concepto,
-          row.total,
-        );
+        void solicitarSugerenciaCuenta(row.id, row.proveedor, row.concepto);
       }
     }
 
@@ -455,10 +440,10 @@ export default function SubirPage() {
                         onChange={(e) =>
                           updateCuentaContable(row.id, e.target.value)
                         }
-                        disabled={row.cuentaContable === ANALIZANDO_CUENTA}
+                        disabled={row.cuentaContable === SUGIRIENDO_CUENTA}
                         placeholder=""
                         className={`w-full min-w-[120px] rounded border border-zinc-300 px-2 py-1.5 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600 disabled:cursor-wait disabled:bg-zinc-50 ${
-                          row.cuentaContable === ANALIZANDO_CUENTA
+                          row.cuentaContable === SUGIRIENDO_CUENTA
                             ? "italic text-zinc-400"
                             : "text-zinc-900"
                         }`}
