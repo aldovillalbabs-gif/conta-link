@@ -1,3 +1,4 @@
+import { createClient } from "@supabase/supabase-js";
 import { createClient as createSupabaseServerClient } from "@/lib/supabase-server";
 import { SubirFacturasPortal } from "./SubirFacturasPortal";
 
@@ -10,7 +11,44 @@ type Cliente = {
   id: string;
   nombre: string;
   slug: string;
+  contador_id: string;
 };
+
+type ContadorInfo = {
+  email: string;
+  nombre: string;
+};
+
+async function getContadorInfo(
+  contadorId: string,
+): Promise<ContadorInfo | null> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    return null;
+  }
+
+  const admin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+
+  const { data, error } = await admin.auth.admin.getUserById(contadorId);
+
+  if (error || !data.user.email) {
+    return null;
+  }
+
+  const metadata = data.user.user_metadata as { full_name?: string } | undefined;
+
+  return {
+    email: data.user.email,
+    nombre: metadata?.full_name?.trim() || data.user.email,
+  };
+}
 
 type Factura = {
   id: string;
@@ -85,7 +123,7 @@ export default async function PortalEmpresaPage({
 
   const { data: clienteData } = await supabase
     .from("clientes")
-    .select("id, nombre, slug, token")
+    .select("id, nombre, slug, token, contador_id")
     .eq("slug", empresaSlug)
     .eq("token", tokenParam)
     .maybeSingle();
@@ -95,6 +133,8 @@ export default async function PortalEmpresaPage({
   if (!cliente) {
     return <PortalLinkInvalido />;
   }
+
+  const contador = await getContadorInfo(cliente.contador_id);
 
   const { data: facturasData } = await supabase
     .from("facturas")
@@ -162,7 +202,12 @@ export default async function PortalEmpresaPage({
           ))}
         </div>
 
-        <SubirFacturasPortal clienteId={cliente.id} />
+        <SubirFacturasPortal
+          clienteId={cliente.id}
+          clienteNombre={cliente.nombre}
+          contadorEmail={contador?.email ?? null}
+          contadorNombre={contador?.nombre ?? null}
+        />
 
         <section className="mt-10">
           <h2 className="text-lg font-semibold text-zinc-900">

@@ -12,6 +12,9 @@ const ACCEPT_FILES =
 
 type SubirFacturasPortalProps = {
   clienteId: string;
+  clienteNombre: string;
+  contadorEmail: string | null;
+  contadorNombre: string | null;
 };
 
 type ParsedCfdi = {
@@ -203,7 +206,26 @@ async function solicitarCuentaContable(
   }
 }
 
-export function SubirFacturasPortal({ clienteId }: SubirFacturasPortalProps) {
+function notificarContador(data: {
+  contadorEmail: string;
+  contadorNombre: string;
+  clienteNombre: string;
+  proveedorFactura: string;
+  montoTotal: number;
+}) {
+  void fetch("/api/notificar-contador", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  }).catch(() => {});
+}
+
+export function SubirFacturasPortal({
+  clienteId,
+  clienteNombre,
+  contadorEmail,
+  contadorNombre,
+}: SubirFacturasPortalProps) {
   const router = useRouter();
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -296,6 +318,16 @@ export function SubirFacturasPortal({ clienteId }: SubirFacturasPortalProps) {
           }
 
           uploadedCount += 1;
+
+          if (contadorEmail) {
+            notificarContador({
+              contadorEmail,
+              contadorNombre: contadorNombre ?? contadorEmail,
+              clienteNombre,
+              proveedorFactura: parsed.proveedor,
+              montoTotal: parsed.total,
+            });
+          }
         } catch (err) {
           const message =
             err instanceof Error
@@ -318,7 +350,7 @@ export function SubirFacturasPortal({ clienteId }: SubirFacturasPortalProps) {
         setError(errors.join(" "));
       }
     },
-    [clienteId, router],
+    [clienteId, clienteNombre, contadorEmail, contadorNombre, router],
   );
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
