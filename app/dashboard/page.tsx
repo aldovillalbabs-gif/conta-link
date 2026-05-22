@@ -178,7 +178,7 @@ export default async function DashboardPage() {
                 className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white"
               >
                 <Link
-                  href={`/portal/${cliente.slug}`}
+                  href={`/facturas/${cliente.id}`}
                   className="flex min-w-0 flex-1 items-center gap-4 p-4 transition-colors hover:bg-zinc-50"
                 >
                   <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-sm font-semibold text-zinc-700">
@@ -198,8 +198,10 @@ export default async function DashboardPage() {
                       {cliente.rfc ? `RFC: ${cliente.rfc}` : "Sin RFC"}
                     </p>
                     <p className="mt-1 text-sm text-zinc-500">
-                      {cliente.totalFacturas} docs · {cliente.pendientes}{" "}
-                      pendientes
+                      {cliente.totalFacturas} docs
+                      {cliente.pendientes > 0
+                        ? ` · ${cliente.pendientes} pendientes`
+                        : ""}
                     </p>
                     <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-100">
                       <div

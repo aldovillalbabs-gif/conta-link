@@ -1,0 +1,218 @@
+"use client";
+
+import { createBrowserClient } from "@supabase/ssr";
+import { useState } from "react";
+
+export type FacturaRow = {
+  id: string;
+  proveedor: string;
+  rfc_emisor: string | null;
+  fecha: string | null;
+  subtotal: number;
+  iva: number;
+  total: number;
+  cuenta_contable: string | null;
+};
+
+type FacturaEditable = FacturaRow & {
+  cuentaContable: string;
+  aprobada: boolean;
+};
+
+type FacturasClienteTableProps = {
+  facturasIniciales: FacturaRow[];
+};
+
+function createSupabaseBrowserClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
+}
+
+function formatMoney(value: number): string {
+  return value.toLocaleString("es-MX", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatFecha(fecha: string | null): string {
+  if (!fecha?.trim()) return "—";
+  const value = fecha.includes("T") ? fecha : `${fecha}T12:00:00`;
+  return new Date(value).toLocaleDateString("es-MX", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function toEditable(factura: FacturaRow): FacturaEditable {
+  const cuenta = factura.cuenta_contable?.trim() ?? "";
+  return {
+    ...factura,
+    cuentaContable: cuenta,
+    aprobada: Boolean(cuenta),
+  };
+}
+
+export default function FacturasClienteTable({
+  facturasIniciales,
+}: FacturasClienteTableProps) {
+  const [facturas, setFacturas] = useState<FacturaEditable[]>(() =>
+    facturasIniciales.map(toEditable),
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [aprobandoId, setAprobandoId] = useState<string | null>(null);
+
+  const updateCuentaContable = (id: string, value: string) => {
+    setFacturas((prev) =>
+      prev.map((row) =>
+        row.id === id
+          ? { ...row, cuentaContable: value, aprobada: false }
+          : row,
+      ),
+    );
+  };
+
+  const aprobarFactura = async (id: string) => {
+    const row = facturas.find((item) => item.id === id);
+    if (!row?.cuentaContable.trim()) {
+      setError("Ingresa una cuenta contable antes de aprobar.");
+      return;
+    }
+
+    setAprobandoId(id);
+    setError(null);
+
+    const supabase = createSupabaseBrowserClient();
+    const { error: updateError } = await supabase
+      .from("facturas")
+      .update({ cuenta_contable: row.cuentaContable.trim() })
+      .eq("id", id);
+
+    setAprobandoId(null);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    setFacturas((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              cuentaContable: row.cuentaContable.trim(),
+              aprobada: true,
+              cuenta_contable: row.cuentaContable.trim(),
+            }
+          : item,
+      ),
+    );
+  };
+
+  if (facturas.length === 0) {
+    return (
+      <p className="mt-8 text-center text-zinc-500">
+        Este cliente no tiene facturas aún.
+      </p>
+    );
+  }
+
+  return (
+    <>
+      {error && (
+        <p className="mt-6 text-sm text-red-600" role="alert">
+          {error}
+        </p>
+      )}
+
+      <div className="mt-8 overflow-x-auto rounded-lg border border-zinc-200">
+        <table className="w-full min-w-[960px] border-collapse text-left text-sm">
+          <thead>
+            <tr className="border-b border-zinc-200 bg-zinc-50">
+              {[
+                "Proveedor",
+                "RFC",
+                "Fecha",
+                "Subtotal",
+                "IVA",
+                "Total",
+                "Cuenta contable",
+                "Estado",
+              ].map((columna) => (
+                <th
+                  key={columna}
+                  className="px-4 py-3 font-medium text-zinc-500"
+                >
+                  {columna}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {facturas.map((row) => (
+              <tr
+                key={row.id}
+                className="border-b border-zinc-100 last:border-0"
+              >
+                <td className="px-4 py-3 text-zinc-900">{row.proveedor}</td>
+                <td className="px-4 py-3 text-zinc-900">
+                  {row.rfc_emisor?.trim() || "—"}
+                </td>
+                <td className="px-4 py-3 text-zinc-900">
+                  {formatFecha(row.fecha)}
+                </td>
+                <td className="px-4 py-3 text-zinc-900">
+                  {formatMoney(Number(row.subtotal))}
+                </td>
+                <td className="px-4 py-3 text-zinc-900">
+                  {formatMoney(Number(row.iva))}
+                </td>
+                <td className="px-4 py-3 text-zinc-900">
+                  {formatMoney(Number(row.total))}
+                </td>
+                <td className="px-4 py-3">
+                  <input
+                    type="text"
+                    value={row.cuentaContable}
+                    onChange={(e) =>
+                      updateCuentaContable(row.id, e.target.value)
+                    }
+                    className="w-full min-w-[180px] rounded border border-zinc-300 px-2 py-1.5 text-zinc-900 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+                  />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {row.aprobada ? (
+                      <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                        Aprobado
+                      </span>
+                    ) : (
+                      <>
+                        <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                          Pendiente
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => void aprobarFactura(row.id)}
+                          disabled={
+                            aprobandoId === row.id || !row.cuentaContable.trim()
+                          }
+                          className="rounded-lg bg-green-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {aprobandoId === row.id ? "Guardando..." : "Aprobar"}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}

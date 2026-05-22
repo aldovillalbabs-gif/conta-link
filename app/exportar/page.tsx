@@ -18,12 +18,6 @@ const formatos = [
   { id: "excel", nombre: "Excel genérico", descripcion: "Hoja de cálculo estándar" },
 ] as const;
 
-const vistaPreviaExcel = [
-  ["630-004", "Comunicaciones Telmex", "580.00", "", "TME850101ABC", "a1b2c3d4..."],
-  ["602-001", "Combustibles OXXO", "1,200.00", "", "OXX970101XYZ", "e5f6g7h8..."],
-  ["500-010", "Insumos Lala", "8,400.00", "", "LAL900101DEF", "i9j0k1l2..."],
-] as const;
-
 type Cliente = {
   id: string;
   nombre: string;
@@ -38,6 +32,7 @@ type Factura = {
   iva: number;
   total: number;
   cuenta_contable: string | null;
+  uuid_cfdi: string | null;
 };
 
 function createSupabaseBrowserClient() {
@@ -52,6 +47,19 @@ function formatMoney(value: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+function formatDebe(value: number): string {
+  return value.toLocaleString("es-MX", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function truncateUuid(uuid: string | null): string {
+  if (!uuid?.trim()) return "—";
+  const trimmed = uuid.trim();
+  return trimmed.length > 8 ? `${trimmed.slice(0, 8)}...` : trimmed;
 }
 
 function getPeriodoActual(): string {
@@ -115,7 +123,9 @@ export default function ExportarPage() {
       const supabase = createSupabaseBrowserClient();
       const { data } = await supabase
         .from("facturas")
-        .select("id, proveedor, rfc_emisor, subtotal, iva, total, cuenta_contable")
+        .select(
+          "id, proveedor, rfc_emisor, subtotal, iva, total, cuenta_contable, uuid_cfdi",
+        )
         .eq("cliente_id", clienteId)
         .order("created_at", { ascending: false });
 
@@ -148,6 +158,19 @@ export default function ExportarPage() {
       { subtotal: 0, iva: 0, total: 0 },
     );
   }, [facturasSeleccionadas]);
+
+  const vistaPreviaExcel = useMemo(
+    () =>
+      facturasSeleccionadas.map((factura) => [
+        factura.cuenta_contable?.trim() || "—",
+        factura.proveedor,
+        formatDebe(Number(factura.total)),
+        "",
+        factura.rfc_emisor?.trim() || "—",
+        truncateUuid(factura.uuid_cfdi),
+      ]),
+    [facturasSeleccionadas],
+  );
 
   const toggleFactura = (id: string) => {
     setSelectedIds((prev) => {
@@ -406,15 +429,29 @@ export default function ExportarPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {vistaPreviaExcel.map((fila, i) => (
-                      <tr key={i} className="border-b border-zinc-100 last:border-0">
-                        {fila.map((celda, j) => (
-                          <td key={j} className="px-3 py-2 text-zinc-700">
-                            {celda}
-                          </td>
-                        ))}
+                    {vistaPreviaExcel.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="px-3 py-6 text-center text-zinc-400"
+                        >
+                          No hay movimientos seleccionados
+                        </td>
                       </tr>
-                    ))}
+                    ) : (
+                      vistaPreviaExcel.map((fila, i) => (
+                        <tr
+                          key={facturasSeleccionadas[i]?.id ?? i}
+                          className="border-b border-zinc-100 last:border-0"
+                        >
+                          {fila.map((celda, j) => (
+                            <td key={j} className="px-3 py-2 text-zinc-700">
+                              {celda}
+                            </td>
+                          ))}
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>

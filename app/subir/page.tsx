@@ -16,7 +16,7 @@ type ClienteOption = {
 type FacturaRow = {
   id: string;
   facturaDbId?: string;
-  cuentaGuardada?: boolean;
+  cuentaAprobada?: boolean;
   proveedor: string;
   concepto: string;
   rfc: string;
@@ -413,12 +413,12 @@ export default function SubirPage() {
   const updateCuentaContable = (id: string, value: string) => {
     setFacturas((prev) =>
       prev.map((row) =>
-        row.id === id ? { ...row, cuentaContable: value, cuentaGuardada: false } : row,
+        row.id === id ? { ...row, cuentaContable: value, cuentaAprobada: false } : row,
       ),
     );
   };
 
-  const guardarCuentaContable = async (rowId: string) => {
+  const aprobarCuentaContable = async (rowId: string) => {
     const row = facturas.find((item) => item.id === rowId);
     if (!row?.facturaDbId || !row.cuentaContable || row.cuentaContable === SUGIRIENDO_CUENTA) {
       return;
@@ -436,7 +436,7 @@ export default function SubirPage() {
 
     setFacturas((prev) =>
       prev.map((item) =>
-        item.id === rowId ? { ...item, cuentaGuardada: true } : item,
+        item.id === rowId ? { ...item, cuentaAprobada: true } : item,
       ),
     );
   };
@@ -601,24 +601,29 @@ export default function SubirPage() {
                               : "text-zinc-900"
                           }`}
                         />
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => void guardarCuentaContable(row.id)}
+                            onClick={() => void aprobarCuentaContable(row.id)}
                             disabled={
+                              row.cuentaAprobada ||
                               !row.facturaDbId ||
                               !row.cuentaContable ||
                               row.cuentaContable === SUGIRIENDO_CUENTA
                             }
                             className="rounded border border-zinc-300 px-2 py-1 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            Guardar
+                            Aprobar
                           </button>
-                          {row.cuentaGuardada && (
-                            <span className="text-xs font-medium text-green-600">
-                              Guardado
+                          {row.cuentaAprobada ? (
+                            <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                              Aprobado
                             </span>
-                          )}
+                          ) : row.facturaDbId ? (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                              Pendiente
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     </td>
