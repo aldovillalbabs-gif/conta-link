@@ -70,6 +70,72 @@ function getPeriodoActual(): string {
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
+const TIPO_EXPORTACION: Record<string, string> = {
+  contpaqi: "CONTPAQi",
+  aspel: "AspelCOI",
+  xml: "XMLSAT",
+  excel: "Excel",
+};
+
+type ExportResumen = {
+  cliente: Cliente;
+  cantidadMovimientos: number;
+  total: number;
+  formatoId: string;
+};
+
+function sanitizeNombreArchivo(nombre: string): string {
+  const sanitized = nombre
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]/g, "");
+
+  return sanitized || "Cliente";
+}
+
+function getMesAnioArchivo(): string {
+  const now = new Date();
+  const mes = now.toLocaleDateString("es-MX", { month: "long" });
+  const mesCapitalizado = mes.charAt(0).toUpperCase() + mes.slice(1);
+  return `${mesCapitalizado}${now.getFullYear()}`;
+}
+
+function generarNombreArchivo(clienteNombre: string, formatoId: string): string {
+  const nombreCliente = sanitizeNombreArchivo(clienteNombre);
+  const tipoExportacion = TIPO_EXPORTACION[formatoId] ?? "Export";
+  return `${nombreCliente}_${tipoExportacion}_${getMesAnioArchivo()}.xlsx`;
+}
+
+function getMensajeFormato(formatoId: string): string {
+  switch (formatoId) {
+    case "contpaqi":
+      return "Listo para importarse en CONTPAQi sin modificaciones";
+    case "aspel":
+      return "Listo para importarse en Aspel COI sin modificaciones";
+    case "xml":
+      return "Listo para enviarse al SAT sin modificaciones";
+    case "excel":
+      return "Listo para importarse en tu sistema contable";
+    default:
+      return "Listo para importarse en tu sistema contable";
+  }
+}
+
+function getMensajeDescarga(formatoId: string): string {
+  switch (formatoId) {
+    case "contpaqi":
+      return "Archivo descargado. Importa este archivo en CONTPAQi para completar el proceso.";
+    case "aspel":
+      return "Archivo descargado. Importa este archivo en Aspel COI para completar el proceso.";
+    case "xml":
+      return "Archivo descargado. Envía este archivo al SAT para completar el proceso.";
+    case "excel":
+      return "Archivo descargado. Importa este archivo en tu sistema contable para completar el proceso.";
+    default:
+      return "Archivo descargado.";
+  }
+}
+
 export default function ExportarPage() {
   const [paso, setPaso] = useState(0);
   const [formatoSeleccionado, setFormatoSeleccionado] = useState("contpaqi");
@@ -79,6 +145,7 @@ export default function ExportarPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [loadingClientes, setLoadingClientes] = useState(true);
   const [loadingFacturas, setLoadingFacturas] = useState(false);
+  const [exportResumen, setExportResumen] = useState<ExportResumen | null>(null);
 
   useEffect(() => {
     async function cargarClientes() {
@@ -183,6 +250,29 @@ export default function ExportarPage() {
       return next;
     });
   };
+
+  const generarExportacion = () => {
+    if (!clienteSeleccionado) return;
+
+    setExportResumen({
+      cliente: clienteSeleccionado,
+      cantidadMovimientos: facturasSeleccionadas.length,
+      total: totales.total,
+      formatoId: formatoSeleccionado,
+    });
+    setPaso(3);
+  };
+
+  const resumenPaso4: ExportResumen | null =
+    exportResumen ??
+    (clienteSeleccionado
+      ? {
+          cliente: clienteSeleccionado,
+          cantidadMovimientos: facturasSeleccionadas.length,
+          total: totales.total,
+          formatoId: formatoSeleccionado,
+        }
+      : null);
 
   return (
     <div className="min-h-screen bg-white">
@@ -467,8 +557,9 @@ export default function ExportarPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setPaso(3)}
-                className="rounded-lg bg-green-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-700"
+                onClick={generarExportacion}
+                disabled={!clienteSeleccionado || facturasSeleccionadas.length === 0}
+                className="rounded-lg bg-green-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Generar y descargar archivo →
               </button>
@@ -476,7 +567,7 @@ export default function ExportarPage() {
           </section>
         )}
 
-        {paso === 3 && (
+        {paso === 3 && resumenPaso4 && (
           <section className="text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
               <svg
@@ -500,16 +591,22 @@ export default function ExportarPage() {
               Paso 4 — ¡Archivo generado!
             </h1>
             <p className="mt-2 text-lg font-medium text-zinc-900">
+              {resumenPaso4.cliente.nombre}
+            </p>
+            <p className="mt-1 text-base text-zinc-700">
               Archivo generado exitosamente
             </p>
             <p className="mt-1 text-zinc-600">
-              Listo para importarse en CONTPAQi sin modificaciones.
+              {getMensajeFormato(resumenPaso4.formatoId)}
             </p>
 
             <ul className="mx-auto mt-8 max-w-md space-y-2 text-left text-sm text-zinc-700">
               {[
-                "Tortilleria_El_Sol_Egresos_Mayo2026.xlsx",
-                "5 movimientos · $15,620.00 MXN",
+                generarNombreArchivo(
+                  resumenPaso4.cliente.nombre,
+                  resumenPaso4.formatoId,
+                ),
+                `${resumenPaso4.cantidadMovimientos} movimientos · ${formatMoney(resumenPaso4.total)} MXN`,
                 "Partida doble cuadrada",
                 "UUIDs de CFDI incluidos",
                 "Guardado en historial",
@@ -527,9 +624,7 @@ export default function ExportarPage() {
               <button
                 type="button"
                 onClick={() =>
-                  alert(
-                    "Archivo descargado. Importa este archivo en CONTPAQi para completar el proceso.",
-                  )
+                  alert(getMensajeDescarga(resumenPaso4.formatoId))
                 }
                 className="rounded-lg bg-green-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-green-700"
               >
@@ -537,7 +632,10 @@ export default function ExportarPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setPaso(0)}
+                onClick={() => {
+                  setExportResumen(null);
+                  setPaso(0);
+                }}
                 className="rounded-lg border border-zinc-300 px-6 py-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
               >
                 Nueva exportación
