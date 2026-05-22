@@ -125,19 +125,19 @@ export default function NavContador() {
 
   return (
     <>
-      <header className="fixed top-0 right-0 left-0 z-40 flex h-16 items-center justify-between border-b border-zinc-100 bg-white px-6 sm:px-10">
+      <header className="fixed top-0 right-0 left-0 z-40 flex h-16 items-center justify-between border-b border-zinc-800 bg-zinc-900 px-6 sm:px-10">
         <Link
           href="/dashboard"
-          className="text-xl font-semibold tracking-tight text-green-600"
+          className="text-sm font-semibold tracking-[0.2em] text-white"
         >
-          ContaLink
+          CONTALINK
         </Link>
         <button
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Abrir menú"
           aria-expanded={open}
-          className="flex h-10 w-10 flex-col items-center justify-center gap-1.5 rounded-lg text-zinc-700 transition-colors hover:bg-zinc-100"
+          className="flex h-10 w-10 flex-col items-center justify-center gap-1.5 rounded-lg text-white transition-colors hover:bg-zinc-800"
         >
           <span className="block h-0.5 w-6 rounded-full bg-current" />
           <span className="block h-0.5 w-6 rounded-full bg-current" />
@@ -154,12 +154,12 @@ export default function NavContador() {
       />
 
       <aside
-        className={`fixed top-0 right-0 z-50 flex h-full w-[260px] flex-col bg-white shadow-xl transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 right-0 z-50 flex h-full w-[260px] flex-col border-l border-zinc-200 bg-white shadow-xl transition-transform duration-300 ease-in-out ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
         aria-hidden={!open}
       >
-        <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-4">
           <span className="font-semibold text-zinc-900">Menú</span>
           <button
             type="button"
@@ -184,11 +184,11 @@ export default function NavContador() {
                     onClick={() => setOpen(false)}
                     className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                       active
-                        ? "bg-green-50 text-green-700"
-                        : "text-zinc-700 hover:bg-zinc-50"
+                        ? "bg-zinc-100 text-zinc-900"
+                        : "text-zinc-900 hover:bg-zinc-50"
                     }`}
                   >
-                    <span className={active ? "text-green-600" : "text-zinc-400"}>
+                    <span className={active ? "text-zinc-900" : "text-zinc-500"}>
                       {item.icon}
                     </span>
                     {item.label}
@@ -199,19 +199,19 @@ export default function NavContador() {
           </ul>
         </nav>
 
-        <div className="border-t border-zinc-100 px-5 py-4">
+        <div className="border-t border-zinc-200 px-5 py-4">
           <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-100 text-sm font-semibold text-sky-700">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-sm font-semibold text-zinc-900">
               {getInitials(nombreUsuario)}
             </span>
-            <span className="text-sm font-medium text-zinc-700">
+            <span className="text-sm font-medium text-zinc-900">
               {nombreUsuario}
             </span>
           </div>
           <button
             type="button"
             onClick={() => void handleSignOut()}
-            className="mt-4 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-400 transition-colors hover:bg-red-50 hover:text-red-500"
+            className="mt-4 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-500 transition-colors hover:bg-red-50"
           >
             <svg
               className="h-5 w-5"

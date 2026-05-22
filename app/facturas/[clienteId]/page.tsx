@@ -50,7 +50,7 @@ export default async function FacturasClientePage({ params }: PageProps) {
     .order("created_at", { ascending: false });
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-zinc-50">
       <NavContador />
 
       <main className="mx-auto max-w-6xl px-6 py-10 sm:px-10">

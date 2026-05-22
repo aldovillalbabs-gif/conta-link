@@ -176,7 +176,7 @@ export default async function ClientesPage({
   const listaClientes = (clientes ?? []) as Cliente[];
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-zinc-50">
       <NavContador />
 
       <main className="mx-auto max-w-5xl px-6 py-10 sm:px-10">
@@ -189,7 +189,7 @@ export default async function ClientesPage({
           {!mostrarFormulario && (
             <Link
               href="/clientes?nuevo=true"
-              className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
+              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
             >
               Agregar cliente
             </Link>
@@ -212,7 +212,7 @@ export default async function ClientesPage({
               <div>
                 <label
                   htmlFor="nombre"
-                  className="block text-sm font-medium text-zinc-700"
+                  className="block text-sm font-medium text-zinc-900"
                 >
                   Nombre de la empresa
                 </label>
@@ -221,14 +221,14 @@ export default async function ClientesPage({
                   name="nombre"
                   type="text"
                   required
-                  className="mt-1.5 w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-zinc-900 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+                  className="mt-1.5 w-full rounded-lg border border-zinc-200 px-3 py-2.5 text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
                 />
               </div>
 
               <div>
                 <label
                   htmlFor="rfc"
-                  className="block text-sm font-medium text-zinc-700"
+                  className="block text-sm font-medium text-zinc-900"
                 >
                   RFC
                 </label>
@@ -236,14 +236,14 @@ export default async function ClientesPage({
                   id="rfc"
                   name="rfc"
                   type="text"
-                  className="mt-1.5 w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-zinc-900 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+                  className="mt-1.5 w-full rounded-lg border border-zinc-200 px-3 py-2.5 text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
                 />
               </div>
 
               <div>
                 <label
                   htmlFor="sistema_contable"
-                  className="block text-sm font-medium text-zinc-700"
+                  className="block text-sm font-medium text-zinc-900"
                 >
                   Sistema contable
                 </label>
@@ -251,7 +251,7 @@ export default async function ClientesPage({
                   id="sistema_contable"
                   name="sistema_contable"
                   defaultValue="CONTPAQi"
-                  className="mt-1.5 w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-zinc-900 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+                  className="mt-1.5 w-full rounded-lg border border-zinc-200 px-3 py-2.5 text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
                 >
                   {SISTEMAS_CONTABLES.map((sistema) => (
                     <option key={sistema} value={sistema}>
@@ -270,13 +270,13 @@ export default async function ClientesPage({
               <div className="flex gap-3 pt-2">
                 <Link
                   href="/clientes"
-                  className="flex flex-1 items-center justify-center rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+                  className="flex flex-1 items-center justify-center rounded-lg border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-50"
                 >
                   Cancelar
                 </Link>
                 <button
                   type="submit"
-                  className="flex-1 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-700"
+                  className="flex-1 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
                 >
                   Guardar cliente
                 </button>
@@ -298,7 +298,7 @@ export default async function ClientesPage({
                 key={cliente.id}
                 className="flex flex-wrap items-center gap-4 rounded-lg border border-zinc-200 bg-white p-4"
               >
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-sm font-semibold text-zinc-700">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-sm font-semibold text-zinc-900">
                   {getInitials(cliente.nombre)}
                 </span>
 
@@ -307,7 +307,7 @@ export default async function ClientesPage({
                   <p className="text-sm text-zinc-500">
                     {cliente.rfc ? `RFC: ${cliente.rfc}` : "Sin RFC"}
                   </p>
-                  <span className="mt-2 inline-block rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700">
+                  <span className="mt-2 inline-block rounded-full border border-zinc-200 bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-900">
                     {cliente.sistema_contable}
                   </span>
                 </div>
@@ -319,13 +319,13 @@ export default async function ClientesPage({
                         ? buildPortalUrl(cliente.slug, cliente.token)
                         : `/portal/${cliente.slug}`
                     }
-                    className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
+                    className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-50"
                   >
                     Ver portal
                   </Link>
                   <Link
                     href="/subir"
-                    className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
+                    className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
                   >
                     Subir facturas
                   </Link>

@@ -154,7 +154,7 @@ export default function FacturasClienteTable({
         </p>
       )}
 
-      <div className="mt-8 overflow-x-auto rounded-lg border border-zinc-200">
+      <div className="mt-8 overflow-x-auto rounded-lg border border-zinc-200 bg-white">
         <table className="w-full min-w-[960px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-zinc-200 bg-zinc-50">
@@ -208,18 +208,18 @@ export default function FacturasClienteTable({
                     onChange={(e) =>
                       updateCuentaContable(row.id, e.target.value)
                     }
-                    className="w-full min-w-[180px] rounded border border-zinc-300 px-2 py-1.5 text-zinc-900 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+                    className="w-full min-w-[180px] rounded border border-zinc-200 px-2 py-1.5 text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
                   />
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap items-center gap-2">
                     {row.aprobada ? (
-                      <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                      <span className="rounded-full border border-zinc-200 bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
                         Aprobado
                       </span>
                     ) : (
                       <>
-                        <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                        <span className="rounded-full border border-zinc-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-600">
                           Pendiente
                         </span>
                         <button
@@ -228,7 +228,7 @@ export default function FacturasClienteTable({
                           disabled={
                             aprobandoId === row.id || !row.cuentaContable.trim()
                           }
-                          className="rounded-lg bg-green-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="rounded-lg bg-zinc-900 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {aprobandoId === row.id ? "Guardando..." : "Aprobar"}
                         </button>

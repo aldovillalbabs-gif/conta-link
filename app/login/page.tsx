@@ -34,26 +34,26 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-100 px-4 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-12">
       <div className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-8 shadow-sm">
         <div className="text-center">
           <Link
             href="/"
-            className="text-2xl font-semibold tracking-tight text-green-600"
+            className="text-sm font-semibold tracking-[0.2em] text-zinc-900"
           >
-            ContaLink
+            CONTALINK
           </Link>
           <h1 className="mt-6 text-2xl font-bold tracking-tight text-zinc-900">
             Bienvenido de nuevo
           </h1>
-          <p className="mt-2 text-sm text-zinc-600">Ingresa a tu cuenta</p>
+          <p className="mt-2 text-sm text-zinc-500">Ingresa a tu cuenta</p>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-5">
           <div>
             <label
               htmlFor="email"
-              className="block text-sm font-medium text-zinc-700"
+              className="block text-sm font-medium text-zinc-900"
             >
               Correo electrónico
             </label>
@@ -64,14 +64,14 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-zinc-900 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+              className="mt-1.5 w-full rounded-lg border border-zinc-200 px-3 py-2.5 text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
             />
           </div>
 
           <div>
             <label
               htmlFor="password"
-              className="block text-sm font-medium text-zinc-700"
+              className="block text-sm font-medium text-zinc-900"
             >
               Contraseña
             </label>
@@ -82,14 +82,14 @@ export default function LoginPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-zinc-900 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+              className="mt-1.5 w-full rounded-lg border border-zinc-200 px-3 py-2.5 text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-green-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-lg bg-zinc-900 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? "Iniciando sesión..." : "Iniciar sesión"}
           </button>
@@ -101,11 +101,11 @@ export default function LoginPage() {
           )}
         </form>
 
-        <p className="mt-6 text-center text-sm text-zinc-600">
+        <p className="mt-6 text-center text-sm text-zinc-500">
           ¿No tienes cuenta?{" "}
           <Link
             href="/registro"
-            className="font-medium text-green-600 hover:text-green-700"
+            className="font-medium text-green-500 hover:text-green-600"
           >
             Regístrate
           </Link>
