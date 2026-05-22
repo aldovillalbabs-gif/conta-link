@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import CopiarLinkPortal from "@/components/CopiarLinkPortal";
 import NavContador from "@/components/NavContador";
 import { createClient as createSupabaseServerClient } from "@/lib/supabase-server";
 
@@ -10,6 +11,7 @@ type Cliente = {
   sistema_contable: string;
   slug: string;
   contador_id: string;
+  token: string | null;
   created_at?: string;
 };
 
@@ -221,12 +223,15 @@ export default async function DashboardPage() {
                     {cliente.progreso}%
                   </span>
                 </Link>
-                <Link
-                  href="/exportar"
-                  className="mr-4 shrink-0 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
-                >
-                  Exportar
-                </Link>
+                <div className="mr-4 flex shrink-0 flex-wrap gap-2">
+                  <CopiarLinkPortal slug={cliente.slug} token={cliente.token} />
+                  <Link
+                    href="/exportar"
+                    className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
+                  >
+                    Exportar
+                  </Link>
+                </div>
               </li>
             ))}
           </ul>

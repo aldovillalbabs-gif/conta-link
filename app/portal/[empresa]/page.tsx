@@ -3,6 +3,7 @@ import { SubirFacturasPortal } from "./SubirFacturasPortal";
 
 type PageProps = {
   params: Promise<{ empresa: string }>;
+  searchParams: Promise<{ token?: string }>;
 };
 
 type Cliente = {
@@ -58,32 +59,41 @@ function getBadge(factura: Factura) {
   };
 }
 
-export default async function PortalEmpresaPage({ params }: PageProps) {
+function PortalLinkInvalido() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-white px-6">
+      <p className="text-center text-lg font-medium text-zinc-700">
+        Link inválido. Solicita un nuevo link a tu contador.
+      </p>
+    </div>
+  );
+}
+
+export default async function PortalEmpresaPage({
+  params,
+  searchParams,
+}: PageProps) {
   const { empresa: empresaSlug } = await params;
+  const { token } = await searchParams;
+  const tokenParam = token?.trim();
+
+  if (!tokenParam) {
+    return <PortalLinkInvalido />;
+  }
+
   const supabase = await createSupabaseServerClient();
 
   const { data: clienteData } = await supabase
     .from("clientes")
-    .select("id, nombre, slug")
+    .select("id, nombre, slug, token")
     .eq("slug", empresaSlug)
+    .eq("token", tokenParam)
     .maybeSingle();
 
   const cliente = clienteData as Cliente | null;
 
   if (!cliente) {
-    return (
-      <div className="min-h-screen bg-white">
-        <header className="flex items-center justify-between border-b border-zinc-100 px-6 py-5 sm:px-10">
-          <span className="text-xl font-semibold tracking-tight text-green-600">
-            ContaLink
-          </span>
-        </header>
-
-        <main className="mx-auto max-w-3xl px-6 py-20 text-center sm:px-10">
-          <p className="text-lg font-medium text-zinc-700">Portal no encontrado</p>
-        </main>
-      </div>
-    );
+    return <PortalLinkInvalido />;
   }
 
   const { data: facturasData } = await supabase

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import NavContador from "@/components/NavContador";
+import { buildPortalUrl } from "@/lib/portal-link";
 
 const SISTEMAS_CONTABLES = [
   "CONTPAQi",
@@ -21,6 +22,7 @@ type Cliente = {
   sistema_contable: string;
   slug: string;
   contador_id: string;
+  token: string | null;
 };
 
 function slugify(nombre: string): string {
@@ -119,6 +121,7 @@ async function crearCliente(formData: FormData) {
   }
 
   const slug = slugify(nombre);
+  const token = crypto.randomUUID().replace(/-/g, "");
 
   if (!slug) {
     redirect(
@@ -132,6 +135,7 @@ async function crearCliente(formData: FormData) {
     sistema_contable: sistemaContable,
     contador_id: contadorId,
     slug,
+    token,
   });
 
   if (insertError) {
@@ -165,7 +169,7 @@ export default async function ClientesPage({
 
   const { data: clientes, error: fetchError } = await supabase
     .from("clientes")
-    .select("id, nombre, rfc, sistema_contable, slug, contador_id")
+    .select("id, nombre, rfc, sistema_contable, slug, contador_id, token")
     .eq("contador_id", user.id)
     .order("nombre", { ascending: true });
 
@@ -310,7 +314,11 @@ export default async function ClientesPage({
 
                 <div className="flex shrink-0 flex-wrap gap-2">
                   <Link
-                    href={`/portal/${cliente.slug}`}
+                    href={
+                      cliente.token
+                        ? buildPortalUrl(cliente.slug, cliente.token)
+                        : `/portal/${cliente.slug}`
+                    }
                     className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
                   >
                     Ver portal

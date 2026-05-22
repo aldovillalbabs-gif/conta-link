@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import FacturasClienteTable from "./FacturasClienteTable";
+import PortalLinkActions from "./PortalLinkActions";
 import NavContador from "@/components/NavContador";
 import { createClient as createSupabaseServerClient } from "@/lib/supabase-server";
 
@@ -12,6 +13,8 @@ type Cliente = {
   id: string;
   nombre: string;
   contador_id: string;
+  slug: string;
+  token: string | null;
 };
 
 export default async function FacturasClientePage({ params }: PageProps) {
@@ -28,7 +31,7 @@ export default async function FacturasClientePage({ params }: PageProps) {
 
   const { data: clienteData } = await supabase
     .from("clientes")
-    .select("id, nombre, contador_id")
+    .select("id, nombre, contador_id, slug, token")
     .eq("id", clienteId)
     .maybeSingle();
 
@@ -58,9 +61,16 @@ export default async function FacturasClientePage({ params }: PageProps) {
           ← Volver
         </Link>
 
-        <h1 className="mt-4 text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
-          Facturas — {cliente.nombre}
-        </h1>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
+            Facturas — {cliente.nombre}
+          </h1>
+          <PortalLinkActions
+            clienteId={cliente.id}
+            slug={cliente.slug}
+            initialToken={cliente.token}
+          />
+        </div>
 
         <FacturasClienteTable facturasIniciales={facturasData ?? []} />
       </main>
