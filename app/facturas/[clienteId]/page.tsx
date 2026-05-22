@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import DescargarReportePdf from "./DescargarReportePdf";
 import FacturasClienteTable from "./FacturasClienteTable";
 import PortalLinkActions from "./PortalLinkActions";
 import NavContador from "@/components/NavContador";
@@ -12,6 +13,7 @@ type PageProps = {
 type Cliente = {
   id: string;
   nombre: string;
+  rfc: string | null;
   contador_id: string;
   slug: string;
   token: string | null;
@@ -31,7 +33,7 @@ export default async function FacturasClientePage({ params }: PageProps) {
 
   const { data: clienteData } = await supabase
     .from("clientes")
-    .select("id, nombre, contador_id, slug, token")
+    .select("id, nombre, rfc, contador_id, slug, token")
     .eq("id", clienteId)
     .maybeSingle();
 
@@ -65,11 +67,17 @@ export default async function FacturasClientePage({ params }: PageProps) {
           <h1 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
             Facturas — {cliente.nombre}
           </h1>
-          <PortalLinkActions
-            clienteId={cliente.id}
-            slug={cliente.slug}
-            initialToken={cliente.token}
-          />
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <DescargarReportePdf
+              cliente={{ nombre: cliente.nombre, rfc: cliente.rfc }}
+              facturas={facturasData ?? []}
+            />
+            <PortalLinkActions
+              clienteId={cliente.id}
+              slug={cliente.slug}
+              initialToken={cliente.token}
+            />
+          </div>
         </div>
 
         <FacturasClienteTable facturasIniciales={facturasData ?? []} />
