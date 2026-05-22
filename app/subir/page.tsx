@@ -9,6 +9,7 @@ const TIMBRE_NS = "http://www.sat.gob.mx/TimbreFiscalDigital";
 type FacturaRow = {
   id: string;
   proveedor: string;
+  concepto: string;
   rfc: string;
   fecha: string;
   uuid: string;
@@ -17,6 +18,8 @@ type FacturaRow = {
   total: string;
   cuentaContable: string;
 };
+
+const ANALIZANDO_CUENTA = "Analizando...";
 
 function readCfdiValue(element: Element, name: string): string {
   const attr = element.getAttribute(name);
@@ -78,6 +81,26 @@ function findComprobante(doc: Document): Element | null {
   return null;
 }
 
+function extractConcepto(comprobante: Element, doc: Document): string {
+  const conceptos = [
+    ...Array.from(comprobante.getElementsByTagNameNS(CFDI_NS, "Concepto")),
+    ...Array.from(doc.getElementsByTagNameNS(CFDI_NS, "Concepto")),
+  ];
+
+  const seen = new Set<Element>();
+  const descripciones: string[] = [];
+
+  for (const concepto of conceptos) {
+    if (seen.has(concepto)) continue;
+    seen.add(concepto);
+
+    const descripcion = readCfdiValue(concepto, "Descripcion");
+    if (descripcion) descripciones.push(descripcion);
+  }
+
+  return descripciones.join(", ") || "Sin concepto";
+}
+
 function parseCfdiXml(xml: string): Omit<FacturaRow, "id" | "cuentaContable"> {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xml, "text/xml");
@@ -110,6 +133,7 @@ function parseCfdiXml(xml: string): Omit<FacturaRow, "id" | "cuentaContable"> {
   const totalRaw = readCfdiValue(comprobante, "Total");
 
   const uuid = extractUuid(doc);
+  const concepto = extractConcepto(comprobante, doc);
 
   if (!proveedor || !rfc || !fecha || !subtotalRaw || !totalRaw) {
     throw new Error("El XML no contiene todos los datos requeridos del CFDI.");
@@ -132,6 +156,7 @@ function parseCfdiXml(xml: string): Omit<FacturaRow, "id" | "cuentaContable"> {
 
   return {
     proveedor,
+    concepto,
     rfc,
     fecha: formatFecha(fecha),
     uuid,
@@ -152,9 +177,66 @@ function isXmlFile(file: File): boolean {
 export default function SubirPage() {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [rows, setRows] = useState<FacturaRow[]>([]);
+  const [facturas, setFacturas] = useState<FacturaRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  const actualizarCuentaContable = useCallback(
+    (rowId: string, cuentaContable: string) => {
+      setFacturas((prev) =>
+        prev.map((row) =>
+          row.id === rowId ? { ...row, cuentaContable } : row,
+        ),
+      );
+    },
+    [],
+  );
+
+  const solicitarSugerenciaCuenta = useCallback(
+    async (rowId: string, proveedor: string, concepto: string, total: string) => {
+      actualizarCuentaContable(rowId, ANALIZANDO_CUENTA);
+
+      const proveedorTrim = proveedor.trim();
+      const conceptoTrim = concepto.trim();
+      const conceptoFinal =
+        conceptoTrim && conceptoTrim !== "Sin concepto"
+          ? conceptoTrim
+          : proveedorTrim;
+      const totalTrim = total.trim();
+
+      const payload = {
+        proveedor: proveedorTrim,
+        concepto: conceptoFinal,
+        total: totalTrim,
+      };
+
+      console.log("[sugerir-cuenta] Enviando:", { rowId, ...payload });
+
+      try {
+        const response = await fetch("/api/sugerir-cuenta", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (response.ok) {
+          const data = (await response.json()) as { cuenta?: string };
+          console.log("[sugerir-cuenta] Respuesta:", { rowId, data });
+          actualizarCuentaContable(rowId, data.cuenta?.trim() ?? "");
+        } else {
+          console.log("[sugerir-cuenta] Error:", {
+            rowId,
+            status: response.status,
+          });
+          actualizarCuentaContable(rowId, "");
+        }
+      } catch (err) {
+        console.log("[sugerir-cuenta] Error:", err);
+        actualizarCuentaContable(rowId, "");
+      }
+    },
+    [actualizarCuentaContable],
+  );
 
   const processFiles = useCallback(async (files: FileList | File[]) => {
     const xmlFiles = Array.from(files).filter(isXmlFile);
@@ -187,7 +269,15 @@ export default function SubirPage() {
     }
 
     if (newRows.length > 0) {
-      setRows((prev) => [...prev, ...newRows]);
+      setFacturas((prev) => [...prev, ...newRows]);
+      for (const row of newRows) {
+        void solicitarSugerenciaCuenta(
+          row.id,
+          row.proveedor,
+          row.concepto,
+          row.total,
+        );
+      }
     }
 
     if (errors.length > 0) {
@@ -195,7 +285,7 @@ export default function SubirPage() {
     } else {
       setError(null);
     }
-  }, []);
+  }, [solicitarSugerenciaCuenta]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { files } = event.target;
@@ -221,15 +311,11 @@ export default function SubirPage() {
   };
 
   const updateCuentaContable = (id: string, value: string) => {
-    setRows((prev) =>
-      prev.map((row) =>
-        row.id === id ? { ...row, cuentaContable: value } : row,
-      ),
-    );
+    actualizarCuentaContable(id, value);
   };
 
   const exportToExcel = () => {
-    const data = rows.map((row) => ({
+    const data = facturas.map((row) => ({
       Proveedor: row.proveedor,
       RFC: row.rfc,
       Fecha: row.fecha,
@@ -335,7 +421,7 @@ export default function SubirPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 ? (
+              {facturas.length === 0 ? (
                 <tr>
                   <td
                     colSpan={8}
@@ -345,7 +431,7 @@ export default function SubirPage() {
                   </td>
                 </tr>
               ) : (
-                rows.map((row) => (
+                facturas.map((row) => (
                   <tr
                     key={row.id}
                     className="border-b border-zinc-100 last:border-0"
@@ -369,8 +455,13 @@ export default function SubirPage() {
                         onChange={(e) =>
                           updateCuentaContable(row.id, e.target.value)
                         }
+                        disabled={row.cuentaContable === ANALIZANDO_CUENTA}
                         placeholder=""
-                        className="w-full min-w-[120px] rounded border border-zinc-300 px-2 py-1.5 text-zinc-900 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+                        className={`w-full min-w-[120px] rounded border border-zinc-300 px-2 py-1.5 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600 disabled:cursor-wait disabled:bg-zinc-50 ${
+                          row.cuentaContable === ANALIZANDO_CUENTA
+                            ? "italic text-zinc-400"
+                            : "text-zinc-900"
+                        }`}
                       />
                     </td>
                   </tr>
@@ -380,7 +471,7 @@ export default function SubirPage() {
           </table>
         </div>
 
-        {rows.length > 0 && (
+        {facturas.length > 0 && (
           <button
             type="button"
             onClick={exportToExcel}
