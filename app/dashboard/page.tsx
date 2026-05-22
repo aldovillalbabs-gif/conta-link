@@ -24,6 +24,7 @@ const metricas = [
 const clientes = [
   {
     nombre: "Tortillería El Sol",
+    slug: "tortilleria-el-sol",
     iniciales: "TE",
     docs: 14,
     pendientes: 3,
@@ -34,6 +35,7 @@ const clientes = [
   },
   {
     nombre: "Farmacia Medina",
+    slug: "farmacia-medina",
     iniciales: "FM",
     docs: 22,
     pendientes: 0,
@@ -44,6 +46,7 @@ const clientes = [
   },
   {
     nombre: "Constructora Pérez",
+    slug: "constructora-perez",
     iniciales: "CP",
     docs: 8,
     pendientes: 8,
@@ -102,7 +105,7 @@ export default function DashboardPage() {
           {clientes.map((cliente) => (
             <li key={cliente.nombre}>
               <Link
-                href="/subir"
+                href={`/portal/${cliente.slug}`}
                 className="flex items-center gap-4 rounded-lg border border-zinc-200 bg-white p-4 transition-colors hover:border-zinc-300 hover:bg-zinc-50"
               >
                 <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-sm font-semibold text-zinc-700">
