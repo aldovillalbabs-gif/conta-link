@@ -630,12 +630,24 @@ export default function SubirPage() {
         </div>
 
         {facturas.length > 0 && (
-          <Link
-            href="/exportar"
-            className="mt-6 inline-block rounded-lg bg-green-600 px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2"
-          >
-            Exportar a CONTPAQi →
-          </Link>
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setFacturas([]);
+                setError(null);
+              }}
+              className="rounded-lg border border-red-200 bg-red-50 px-6 py-3 text-sm font-medium text-red-700 transition-colors hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2"
+            >
+              Limpiar tabla
+            </button>
+            <Link
+              href="/exportar"
+              className="rounded-lg bg-green-600 px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2"
+            >
+              Exportar a CONTPAQi →
+            </Link>
+          </div>
         )}
       </main>
     </div>

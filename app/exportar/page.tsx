@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { createBrowserClient } from "@supabase/ssr";
+import { useEffect, useMemo, useState } from "react";
 import NavContador from "@/components/NavContador";
 
 const PASOS = [
@@ -8,44 +9,6 @@ const PASOS = [
   "Resumen de la póliza",
   "Formato de exportación",
   "¡Archivo generado!",
-] as const;
-
-const movimientos = [
-  {
-    id: "1",
-    nombre: "Factura Telmex",
-    detalle: "comunicaciones",
-    cuenta: "630-004 Comunicaciones",
-    monto: "$580.00",
-  },
-  {
-    id: "2",
-    nombre: "Recibo gasolina OXXO",
-    detalle: "",
-    cuenta: "602-001 Combustibles",
-    monto: "$1,200.00",
-  },
-  {
-    id: "3",
-    nombre: "Factura Lala",
-    detalle: "materia prima",
-    cuenta: "500-010 Insumos producción",
-    monto: "$8,400.00",
-  },
-  {
-    id: "4",
-    nombre: "Comida con clientes",
-    detalle: "",
-    cuenta: "630-012 Gastos representación",
-    monto: "$2,340.00",
-  },
-  {
-    id: "5",
-    nombre: "Factura CFE electricidad",
-    detalle: "",
-    cuenta: "630-001 Servicios básicos",
-    monto: "$3,100.00",
-  },
 ] as const;
 
 const formatos = [
@@ -61,9 +24,142 @@ const vistaPreviaExcel = [
   ["500-010", "Insumos Lala", "8,400.00", "", "LAL900101DEF", "i9j0k1l2..."],
 ] as const;
 
+type Cliente = {
+  id: string;
+  nombre: string;
+  rfc: string | null;
+};
+
+type Factura = {
+  id: string;
+  proveedor: string;
+  rfc_emisor: string | null;
+  subtotal: number;
+  iva: number;
+  total: number;
+  cuenta_contable: string | null;
+};
+
+function createSupabaseBrowserClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
+}
+
+function formatMoney(value: number): string {
+  return `$${value.toLocaleString("es-MX", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function getPeriodoActual(): string {
+  const raw = new Date().toLocaleDateString("es-MX", {
+    month: "long",
+    year: "numeric",
+  });
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
 export default function ExportarPage() {
   const [paso, setPaso] = useState(0);
   const [formatoSeleccionado, setFormatoSeleccionado] = useState("contpaqi");
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [clienteId, setClienteId] = useState("");
+  const [facturas, setFacturas] = useState<Factura[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [loadingClientes, setLoadingClientes] = useState(true);
+  const [loadingFacturas, setLoadingFacturas] = useState(false);
+
+  useEffect(() => {
+    async function cargarClientes() {
+      setLoadingClientes(true);
+      const supabase = createSupabaseBrowserClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setClientes([]);
+        setLoadingClientes(false);
+        return;
+      }
+
+      const { data } = await supabase
+        .from("clientes")
+        .select("id, nombre, rfc")
+        .eq("contador_id", user.id)
+        .order("nombre", { ascending: true });
+
+      const lista = (data ?? []) as Cliente[];
+      setClientes(lista);
+      if (lista.length > 0) {
+        setClienteId((prev) => prev || lista[0].id);
+      }
+      setLoadingClientes(false);
+    }
+
+    void cargarClientes();
+  }, []);
+
+  useEffect(() => {
+    async function cargarFacturas() {
+      if (!clienteId) {
+        setFacturas([]);
+        setSelectedIds(new Set());
+        return;
+      }
+
+      setLoadingFacturas(true);
+      const supabase = createSupabaseBrowserClient();
+      const { data } = await supabase
+        .from("facturas")
+        .select("id, proveedor, rfc_emisor, subtotal, iva, total, cuenta_contable")
+        .eq("cliente_id", clienteId)
+        .order("created_at", { ascending: false });
+
+      const lista = (data ?? []) as Factura[];
+      setFacturas(lista);
+      setSelectedIds(new Set(lista.map((factura) => factura.id)));
+      setLoadingFacturas(false);
+    }
+
+    void cargarFacturas();
+  }, [clienteId]);
+
+  const clienteSeleccionado = useMemo(
+    () => clientes.find((cliente) => cliente.id === clienteId),
+    [clientes, clienteId],
+  );
+
+  const facturasSeleccionadas = useMemo(
+    () => facturas.filter((factura) => selectedIds.has(factura.id)),
+    [facturas, selectedIds],
+  );
+
+  const totales = useMemo(() => {
+    return facturasSeleccionadas.reduce(
+      (acc, factura) => ({
+        subtotal: acc.subtotal + Number(factura.subtotal),
+        iva: acc.iva + Number(factura.iva),
+        total: acc.total + Number(factura.total),
+      }),
+      { subtotal: 0, iva: 0, total: 0 },
+    );
+  }, [facturasSeleccionadas]);
+
+  const toggleFactura = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -101,55 +197,104 @@ export default function ExportarPage() {
               Elige cuáles movimientos incluir en esta exportación.
             </p>
 
-            <div className="mt-6 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
-              <span className="text-sm font-medium text-zinc-700">
-                Tortillería El Sol · Mayo 2026
-              </span>
-              <span className="text-sm text-zinc-500">5 de 5 seleccionados</span>
+            <div className="mt-6">
+              <label
+                htmlFor="cliente-exportar"
+                className="block text-sm font-medium text-zinc-700"
+              >
+                Cliente:
+              </label>
+              <select
+                id="cliente-exportar"
+                value={clienteId}
+                onChange={(e) => setClienteId(e.target.value)}
+                disabled={loadingClientes || clientes.length === 0}
+                className="mt-1.5 w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-zinc-900 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600 disabled:bg-zinc-50"
+              >
+                {clientes.length === 0 ? (
+                  <option value="">Sin clientes</option>
+                ) : (
+                  clientes.map((cliente) => (
+                    <option key={cliente.id} value={cliente.id}>
+                      {cliente.nombre}
+                    </option>
+                  ))
+                )}
+              </select>
             </div>
 
-            <ul className="mt-4 space-y-2">
-              {movimientos.map((mov) => (
-                <li
-                  key={mov.id}
-                  className="flex items-start gap-3 rounded-lg border border-zinc-200 px-4 py-3"
-                >
-                  <input
-                    type="checkbox"
-                    defaultChecked
-                    className="mt-1 h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-600"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-zinc-900">
-                      {mov.nombre}
-                      {mov.detalle ? (
-                        <span className="font-normal text-zinc-500">
-                          {" "}
-                          — {mov.detalle}
-                        </span>
-                      ) : null}
-                    </p>
-                    <div className="mt-1 flex flex-wrap items-center gap-2">
-                      <span className="text-sm text-zinc-600">{mov.cuenta}</span>
-                      <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800">
-                        IA
-                      </span>
-                    </div>
-                  </div>
-                  <span className="shrink-0 font-medium text-zinc-900">
-                    {mov.monto}
+            {loadingClientes ? (
+              <p className="mt-8 text-center text-sm text-zinc-500">
+                Cargando clientes...
+              </p>
+            ) : clientes.length === 0 ? (
+              <p className="mt-8 text-center text-zinc-500">
+                Agrega clientes primero en la sección Clientes
+              </p>
+            ) : loadingFacturas ? (
+              <p className="mt-8 text-center text-sm text-zinc-500">
+                Cargando facturas...
+              </p>
+            ) : facturas.length === 0 ? (
+              <p className="mt-8 text-center text-zinc-500">
+                Este cliente no tiene facturas aún
+              </p>
+            ) : (
+              <>
+                <div className="mt-6 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
+                  <span className="text-sm font-medium text-zinc-700">
+                    {clienteSeleccionado?.nombre} · {getPeriodoActual()}
                   </span>
-                </li>
-              ))}
-            </ul>
+                  <span className="text-sm text-zinc-500">
+                    {selectedIds.size} de {facturas.length} seleccionados
+                  </span>
+                </div>
 
-            <button
-              type="button"
-              onClick={() => setPaso(1)}
-              className="mt-8 w-full rounded-lg bg-green-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2 sm:w-auto"
-            >
-              Revisar resumen →
-            </button>
+                <ul className="mt-4 space-y-2">
+                  {facturas.map((factura) => (
+                    <li
+                      key={factura.id}
+                      className="flex items-start gap-3 rounded-lg border border-zinc-200 px-4 py-3"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(factura.id)}
+                        onChange={() => toggleFactura(factura.id)}
+                        className="mt-1 h-4 w-4 rounded border-zinc-300 text-green-600 focus:ring-green-600"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-zinc-900">
+                          {factura.proveedor}
+                        </p>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <span className="text-sm text-zinc-600">
+                            {factura.cuenta_contable?.trim() ||
+                              "Sin cuenta contable"}
+                          </span>
+                          {factura.cuenta_contable?.trim() ? (
+                            <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800">
+                              IA
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <span className="shrink-0 font-medium text-zinc-900">
+                        {formatMoney(Number(factura.total))}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+
+                <button
+                  type="button"
+                  onClick={() => setPaso(1)}
+                  disabled={selectedIds.size === 0}
+                  className="mt-8 w-full rounded-lg bg-green-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                >
+                  Revisar resumen →
+                </button>
+              </>
+            )}
           </section>
         )}
 
@@ -164,12 +309,12 @@ export default function ExportarPage() {
                 <tbody>
                   {[
                     ["Tipo de póliza", "Egresos"],
-                    ["Empresa", "Tortillería El Sol"],
-                    ["RFC", "TES850101ABC"],
-                    ["Período", "Mayo 2026"],
-                    ["Movimientos", "5"],
-                    ["Subtotal", "$13,474.14"],
-                    ["IVA", "$2,145.86"],
+                    ["Empresa", clienteSeleccionado?.nombre ?? "—"],
+                    ["RFC", clienteSeleccionado?.rfc ?? "—"],
+                    ["Período", getPeriodoActual()],
+                    ["Movimientos", String(facturasSeleccionadas.length)],
+                    ["Subtotal", formatMoney(totales.subtotal)],
+                    ["IVA", formatMoney(totales.iva)],
                   ].map(([label, value]) => (
                     <tr key={label} className="border-b border-zinc-100 last:border-0">
                       <th className="px-4 py-3 font-medium text-zinc-500">
@@ -181,7 +326,7 @@ export default function ExportarPage() {
                   <tr>
                     <th className="px-4 py-3 font-medium text-zinc-500">Total</th>
                     <td className="px-4 py-3 text-lg font-semibold text-green-600">
-                      $15,620.00
+                      {formatMoney(totales.total)}
                     </td>
                   </tr>
                 </tbody>

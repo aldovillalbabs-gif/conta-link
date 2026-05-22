@@ -67,9 +67,41 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function getInitials(nombre: string): string {
+  const parts = nombre.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "??";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
 export default function NavContador() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [nombreUsuario, setNombreUsuario] = useState("");
+
+  useEffect(() => {
+    async function cargarUsuario() {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      );
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      const fullName = user.user_metadata?.full_name;
+      setNombreUsuario(
+        typeof fullName === "string" && fullName.trim()
+          ? fullName.trim()
+          : user.email ?? "",
+      );
+    }
+
+    void cargarUsuario();
+  }, []);
 
   useEffect(() => {
     setOpen(false);
@@ -170,9 +202,11 @@ export default function NavContador() {
         <div className="border-t border-zinc-100 px-5 py-4">
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-100 text-sm font-semibold text-sky-700">
-              CR
+              {getInitials(nombreUsuario)}
             </span>
-            <span className="text-sm font-medium text-zinc-700">C.P. Ramírez</span>
+            <span className="text-sm font-medium text-zinc-700">
+              {nombreUsuario}
+            </span>
           </div>
           <button
             type="button"
