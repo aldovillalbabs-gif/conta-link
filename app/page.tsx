@@ -17,7 +17,7 @@ export default function Home() {
           Sube tus facturas, nosotros hacemos el resto
         </p>
         <Link
-          href="/dashboard"
+          href="/login"
           className="mt-10 rounded-lg bg-green-600 px-8 py-3.5 text-base font-medium text-white shadow-sm transition-colors hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2"
         >
           Subir facturas
