@@ -1,14 +1,22 @@
 "use client";
 
+import { createBrowserClient } from "@supabase/ssr";
 import Link from "next/link";
-import { useCallback, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import NavContador from "@/components/NavContador";
 
 const CFDI_NS = "http://www.sat.gob.mx/cfd/4";
 const TIMBRE_NS = "http://www.sat.gob.mx/TimbreFiscalDigital";
 
+type ClienteOption = {
+  id: string;
+  nombre: string;
+};
+
 type FacturaRow = {
   id: string;
+  facturaDbId?: string;
+  cuentaGuardada?: boolean;
   proveedor: string;
   concepto: string;
   rfc: string;
@@ -21,6 +29,53 @@ type FacturaRow = {
 };
 
 const SUGIRIENDO_CUENTA = "Sugiriendo...";
+
+function createSupabaseBrowserClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  );
+}
+
+function moneyToNumber(value: string): number {
+  return Number.parseFloat(value.replace(/,/g, ""));
+}
+
+type GuardarFacturaInput = {
+  cliente_id: string;
+  proveedor: string;
+  rfc_emisor: string;
+  fecha: string;
+  subtotal: number;
+  iva: number;
+  total: number;
+  uuid_cfdi: string;
+  cuenta_contable: string;
+};
+
+async function guardarFactura(data: GuardarFacturaInput) {
+  const supabase = createSupabaseBrowserClient();
+  const { data: inserted, error } = await supabase
+    .from("facturas")
+    .insert(data)
+    .select("id")
+    .single();
+
+  return { id: inserted?.id as string | undefined, error };
+}
+
+async function actualizarCuentaContableFactura(
+  facturaDbId: string,
+  cuenta_contable: string,
+) {
+  const supabase = createSupabaseBrowserClient();
+  const { error } = await supabase
+    .from("facturas")
+    .update({ cuenta_contable })
+    .eq("id", facturaDbId);
+
+  return { error };
+}
 
 function readCfdiValue(element: Element, name: string): string {
   const attr = element.getAttribute(name);
@@ -178,9 +233,36 @@ function isXmlFile(file: File): boolean {
 export default function SubirPage() {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const [clientes, setClientes] = useState<ClienteOption[]>([]);
+  const [clienteId, setClienteId] = useState("");
   const [facturas, setFacturas] = useState<FacturaRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    async function cargarClientes() {
+      const supabase = createSupabaseBrowserClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      const { data } = await supabase
+        .from("clientes")
+        .select("id, nombre")
+        .eq("contador_id", user.id)
+        .order("nombre", { ascending: true });
+
+      const lista = data ?? [];
+      setClientes(lista);
+      if (lista.length > 0) {
+        setClienteId((prev) => prev || lista[0].id);
+      }
+    }
+
+    void cargarClientes();
+  }, []);
 
   const actualizarCuentaContable = useCallback(
     (rowId: string, cuentaContable: string) => {
@@ -236,6 +318,11 @@ export default function SubirPage() {
       return;
     }
 
+    if (!clienteId) {
+      setError("Selecciona un cliente antes de subir facturas.");
+      return;
+    }
+
     const newRows: FacturaRow[] = [];
     const errors: string[] = [];
 
@@ -243,11 +330,38 @@ export default function SubirPage() {
       try {
         const xml = await file.text();
         const parsed = parseCfdiXml(xml);
-        newRows.push({
+        const row: FacturaRow = {
           ...parsed,
           id: crypto.randomUUID(),
           cuentaContable: "",
+        };
+
+        const { id: facturaDbId, error: saveError } = await guardarFactura({
+          cliente_id: clienteId,
+          proveedor: parsed.proveedor,
+          rfc_emisor: parsed.rfc,
+          fecha: parsed.fecha,
+          subtotal: moneyToNumber(parsed.subtotal),
+          iva: moneyToNumber(parsed.iva),
+          total: moneyToNumber(parsed.total),
+          uuid_cfdi: parsed.uuid,
+          cuenta_contable: "",
         });
+
+        if (saveError) {
+          errors.push(
+            xmlFiles.length > 1
+              ? `${file.name}: ${saveError.message}`
+              : saveError.message,
+          );
+          continue;
+        }
+
+        if (facturaDbId) {
+          row.facturaDbId = facturaDbId;
+        }
+
+        newRows.push(row);
       } catch (err) {
         const message =
           err instanceof Error
@@ -271,7 +385,7 @@ export default function SubirPage() {
     } else {
       setError(null);
     }
-  }, [solicitarSugerenciaCuenta]);
+  }, [clienteId, solicitarSugerenciaCuenta]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { files } = event.target;
@@ -297,7 +411,34 @@ export default function SubirPage() {
   };
 
   const updateCuentaContable = (id: string, value: string) => {
-    actualizarCuentaContable(id, value);
+    setFacturas((prev) =>
+      prev.map((row) =>
+        row.id === id ? { ...row, cuentaContable: value, cuentaGuardada: false } : row,
+      ),
+    );
+  };
+
+  const guardarCuentaContable = async (rowId: string) => {
+    const row = facturas.find((item) => item.id === rowId);
+    if (!row?.facturaDbId || !row.cuentaContable || row.cuentaContable === SUGIRIENDO_CUENTA) {
+      return;
+    }
+
+    const { error: updateError } = await actualizarCuentaContableFactura(
+      row.facturaDbId,
+      row.cuentaContable,
+    );
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    setFacturas((prev) =>
+      prev.map((item) =>
+        item.id === rowId ? { ...item, cuentaGuardada: true } : item,
+      ),
+    );
   };
 
   return (
@@ -315,6 +456,31 @@ export default function SubirPage() {
         <h1 className="mt-4 text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
           Subir facturas
         </h1>
+
+        <div className="mt-6 w-full max-w-xl">
+          <label
+            htmlFor="cliente"
+            className="block text-sm font-medium text-zinc-700"
+          >
+            Cliente:
+          </label>
+          <select
+            id="cliente"
+            value={clienteId}
+            onChange={(e) => setClienteId(e.target.value)}
+            className="mt-1.5 w-full rounded-lg border border-zinc-300 px-3 py-2.5 text-zinc-900 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+          >
+            {clientes.length === 0 ? (
+              <option value="">Sin clientes registrados</option>
+            ) : (
+              clientes.map((cliente) => (
+                <option key={cliente.id} value={cliente.id}>
+                  {cliente.nombre}
+                </option>
+              ))
+            )}
+          </select>
+        </div>
 
         <div className="mt-8 flex flex-col items-center">
           <div
@@ -420,20 +586,41 @@ export default function SubirPage() {
                     <td className="px-4 py-3 text-zinc-900">{row.iva}</td>
                     <td className="px-4 py-3 text-zinc-900">{row.total}</td>
                     <td className="px-4 py-3">
-                      <input
-                        type="text"
-                        value={row.cuentaContable}
-                        onChange={(e) =>
-                          updateCuentaContable(row.id, e.target.value)
-                        }
-                        disabled={row.cuentaContable === SUGIRIENDO_CUENTA}
-                        placeholder=""
-                        className={`w-full min-w-[120px] rounded border border-zinc-300 px-2 py-1.5 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600 disabled:cursor-wait disabled:bg-zinc-50 ${
-                          row.cuentaContable === SUGIRIENDO_CUENTA
-                            ? "italic text-zinc-400"
-                            : "text-zinc-900"
-                        }`}
-                      />
+                      <div className="flex min-w-[200px] flex-col gap-2">
+                        <input
+                          type="text"
+                          value={row.cuentaContable}
+                          onChange={(e) =>
+                            updateCuentaContable(row.id, e.target.value)
+                          }
+                          disabled={row.cuentaContable === SUGIRIENDO_CUENTA}
+                          placeholder=""
+                          className={`w-full rounded border border-zinc-300 px-2 py-1.5 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600 disabled:cursor-wait disabled:bg-zinc-50 ${
+                            row.cuentaContable === SUGIRIENDO_CUENTA
+                              ? "italic text-zinc-400"
+                              : "text-zinc-900"
+                          }`}
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void guardarCuentaContable(row.id)}
+                            disabled={
+                              !row.facturaDbId ||
+                              !row.cuentaContable ||
+                              row.cuentaContable === SUGIRIENDO_CUENTA
+                            }
+                            className="rounded border border-zinc-300 px-2 py-1 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Guardar
+                          </button>
+                          {row.cuentaGuardada && (
+                            <span className="text-xs font-medium text-green-600">
+                              Guardado
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 ))

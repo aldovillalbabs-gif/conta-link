@@ -13,6 +13,17 @@ type Cliente = {
   created_at?: string;
 };
 
+type FacturaResumen = {
+  cliente_id: string;
+  cuenta_contable: string | null;
+};
+
+type ClienteConFacturas = Cliente & {
+  totalFacturas: number;
+  pendientes: number;
+  progreso: number;
+};
+
 function getInitials(nombre: string): string {
   const parts = nombre.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "??";
@@ -39,22 +50,76 @@ export default async function DashboardPage() {
 
   const listaClientes = (clientes ?? []) as Cliente[];
 
+  const clienteIds = listaClientes.map((cliente) => cliente.id);
+  const { data: facturas } =
+    clienteIds.length > 0
+      ? await supabase
+          .from("facturas")
+          .select("cliente_id, cuenta_contable")
+          .in("cliente_id", clienteIds)
+      : { data: [] as FacturaResumen[] };
+
+  const facturasList = (facturas ?? []) as FacturaResumen[];
+
+  const clientesConFacturas: ClienteConFacturas[] = listaClientes.map(
+    (cliente) => {
+      const facturasCliente = facturasList.filter(
+        (factura) => factura.cliente_id === cliente.id,
+      );
+      const totalFacturas = facturasCliente.length;
+      const pendientes = facturasCliente.filter(
+        (factura) => !factura.cuenta_contable?.trim(),
+      ).length;
+      const progreso =
+        totalFacturas === 0
+          ? 0
+          : pendientes === 0
+            ? 100
+            : 50;
+
+      return {
+        ...cliente,
+        totalFacturas,
+        pendientes,
+        progreso,
+      };
+    },
+  );
+
+  const docsPorClasificar = facturasList.filter(
+    (factura) => !factura.cuenta_contable?.trim(),
+  ).length;
+
+  const facturasClasificadas = facturasList.filter((factura) =>
+    factura.cuenta_contable?.trim(),
+  ).length;
+
+  const exportacionesListas = new Set(
+    facturasList
+      .filter((factura) => factura.cuenta_contable?.trim())
+      .map((factura) => factura.cliente_id),
+  ).size;
+
+  const clientesConPendientes = clientesConFacturas.filter(
+    (cliente) => cliente.pendientes > 0,
+  ).length;
+
   const metricas = [
     {
       titulo: "Clientes activos",
       valor: String(listaClientes.length),
-      subtexto: "3 con docs pendientes",
+      subtexto: `${clientesConPendientes} con docs pendientes`,
       valorClass: "text-zinc-900",
     },
     {
       titulo: "Docs por clasificar",
-      valor: "0",
-      subtexto: "IA clasificó 34 solos",
+      valor: String(docsPorClasificar),
+      subtexto: `IA clasificó ${facturasClasificadas} solos`,
       valorClass: "text-amber-600",
     },
     {
       titulo: "Exportaciones listas",
-      valor: "0",
+      valor: String(exportacionesListas),
       subtexto: "Listas para CONTPAQi",
       valorClass: "text-green-600",
     },
@@ -107,7 +172,7 @@ export default async function DashboardPage() {
           </p>
         ) : (
           <ul className="mt-10 space-y-3">
-            {listaClientes.map((cliente) => (
+            {clientesConFacturas.map((cliente) => (
               <li
                 key={cliente.id}
                 className="flex items-center gap-3 rounded-lg border border-zinc-200 bg-white"
@@ -132,16 +197,26 @@ export default async function DashboardPage() {
                     <p className="mt-1 text-sm text-zinc-500">
                       {cliente.rfc ? `RFC: ${cliente.rfc}` : "Sin RFC"}
                     </p>
+                    <p className="mt-1 text-sm text-zinc-500">
+                      {cliente.totalFacturas} docs · {cliente.pendientes}{" "}
+                      pendientes
+                    </p>
                     <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-100">
                       <div
-                        className="h-full rounded-full bg-green-500"
-                        style={{ width: "0%" }}
+                        className={`h-full rounded-full ${
+                          cliente.progreso === 100
+                            ? "bg-green-500"
+                            : cliente.progreso === 50
+                              ? "bg-amber-500"
+                              : "bg-green-500"
+                        }`}
+                        style={{ width: `${cliente.progreso}%` }}
                       />
                     </div>
                   </div>
 
                   <span className="hidden shrink-0 text-sm font-medium text-zinc-400 sm:block">
-                    0%
+                    {cliente.progreso}%
                   </span>
                 </Link>
                 <Link
