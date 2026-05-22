@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { createClient as createSupabaseServerClient } from "@/lib/supabase-server";
 import { SubirFacturasPortal } from "./SubirFacturasPortal";
 
@@ -128,14 +127,7 @@ export default async function PortalEmpresaPage({ params }: PageProps) {
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-10 sm:px-10">
-        <Link
-          href="/dashboard"
-          className="text-sm text-zinc-500 transition-colors hover:text-zinc-900"
-        >
-          ← Volver al dashboard
-        </Link>
-
-        <h1 className="mt-4 text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
           Bienvenido, {cliente.nombre}
         </h1>
         <p className="mt-2 text-zinc-600">

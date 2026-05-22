@@ -1,9 +1,8 @@
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 const CFDI_NS = "http://www.sat.gob.mx/cfd/4";
 const TIMBRE_NS = "http://www.sat.gob.mx/TimbreFiscalDigital";
@@ -211,7 +210,17 @@ export function SubirFacturasPortal({ clienteId }: SubirFacturasPortalProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [showSuccessBanner, setShowSuccessBanner] = useState(false);
+
+  useEffect(() => {
+    if (!showSuccessBanner) return;
+
+    const timer = window.setTimeout(() => {
+      setShowSuccessBanner(false);
+    }, 3000);
+
+    return () => window.clearTimeout(timer);
+  }, [showSuccessBanner]);
 
   const processFiles = useCallback(
     async (files: FileList | File[]) => {
@@ -228,7 +237,7 @@ export function SubirFacturasPortal({ clienteId }: SubirFacturasPortalProps) {
         setError(null);
       }
 
-      setSuccess(null);
+      setShowSuccessBanner(false);
       setIsUploading(true);
 
       const supabase = createSupabaseBrowserClient();
@@ -301,7 +310,7 @@ export function SubirFacturasPortal({ clienteId }: SubirFacturasPortalProps) {
       setIsUploading(false);
 
       if (uploadedCount > 0) {
-        setSuccess("Factura subida correctamente");
+        setShowSuccessBanner(true);
         router.refresh();
       }
 
@@ -365,7 +374,19 @@ export function SubirFacturasPortal({ clienteId }: SubirFacturasPortalProps) {
         <p className="mt-4 text-center text-sm font-medium text-zinc-600">
           Arrastra tus facturas aquí
         </p>
+        <p className="mt-2 text-center text-xs text-zinc-500">
+          Acepta XML, PDF e imágenes
+        </p>
       </div>
+
+      {showSuccessBanner && (
+        <div
+          className="mt-4 w-full rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-center text-sm font-medium text-green-800"
+          role="status"
+        >
+          ✓ Factura enviada a tu contador correctamente
+        </div>
+      )}
 
       <input
         ref={inputRef}
@@ -386,24 +407,11 @@ export function SubirFacturasPortal({ clienteId }: SubirFacturasPortalProps) {
         {isUploading ? "Subiendo..." : "O selecciona archivos"}
       </button>
 
-      {success && (
-        <p className="mt-4 text-center text-sm font-medium text-green-600" role="status">
-          {success}
-        </p>
-      )}
-
       {error && (
         <p className="mt-4 text-center text-sm text-red-600" role="alert">
           {error}
         </p>
       )}
-
-      <Link
-        href="/subir"
-        className="mt-6 rounded-lg bg-green-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2"
-      >
-        Subir facturas al contador
-      </Link>
     </div>
   );
 }
