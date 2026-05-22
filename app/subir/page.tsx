@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useId, useRef, useState } from "react";
-import * as XLSX from "xlsx";
+import NavContador from "@/components/NavContador";
 
 const CFDI_NS = "http://www.sat.gob.mx/cfd/4";
 const TIMBRE_NS = "http://www.sat.gob.mx/TimbreFiscalDigital";
@@ -299,34 +300,19 @@ export default function SubirPage() {
     actualizarCuentaContable(id, value);
   };
 
-  const exportToExcel = () => {
-    const data = facturas.map((row) => ({
-      Proveedor: row.proveedor,
-      RFC: row.rfc,
-      Fecha: row.fecha,
-      UUID: row.uuid,
-      Subtotal: row.subtotal,
-      IVA: row.iva,
-      Total: row.total,
-      "Cuenta contable": row.cuentaContable,
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Facturas");
-    XLSX.writeFile(workbook, "facturas.xlsx");
-  };
-
   return (
     <div className="min-h-screen bg-white">
-      <header className="border-b border-zinc-100 px-6 py-5 sm:px-10">
-        <span className="text-xl font-semibold tracking-tight text-green-600">
-          ContaLink
-        </span>
-      </header>
+      <NavContador />
 
       <main className="mx-auto max-w-6xl px-6 py-10 sm:px-10">
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
+        <Link
+          href="/dashboard"
+          className="text-sm text-zinc-500 transition-colors hover:text-zinc-900"
+        >
+          ← Volver al dashboard
+        </Link>
+
+        <h1 className="mt-4 text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
           Subir facturas
         </h1>
 
@@ -457,13 +443,12 @@ export default function SubirPage() {
         </div>
 
         {facturas.length > 0 && (
-          <button
-            type="button"
-            onClick={exportToExcel}
-            className="mt-6 rounded-lg bg-green-600 px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2"
+          <Link
+            href="/exportar"
+            className="mt-6 inline-block rounded-lg bg-green-600 px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2"
           >
-            Exportar a Excel
-          </button>
+            Exportar a CONTPAQi →
+          </Link>
         )}
       </main>
     </div>

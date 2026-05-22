@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import NavContador from "@/components/NavContador";
 
 const PASOS = [
   "Selecciona los documentos",
@@ -66,11 +67,7 @@ export default function ExportarPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <header className="border-b border-zinc-100 px-6 py-5 sm:px-10">
-        <span className="text-xl font-semibold tracking-tight text-green-600">
-          ContaLink
-        </span>
-      </header>
+      <NavContador />
 
       <main className="mx-auto max-w-3xl px-6 py-8 sm:px-10">
         <nav
@@ -347,6 +344,11 @@ export default function ExportarPage() {
             <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row">
               <button
                 type="button"
+                onClick={() =>
+                  alert(
+                    "Archivo descargado. Importa este archivo en CONTPAQi para completar el proceso.",
+                  )
+                }
                 className="rounded-lg bg-green-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-green-700"
               >
                 Descargar archivo

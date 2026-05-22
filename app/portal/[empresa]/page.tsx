@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useId, useRef, useState } from "react";
 
@@ -88,7 +89,14 @@ export default function PortalEmpresaPage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-10 sm:px-10">
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
+        <Link
+          href="/dashboard"
+          className="text-sm text-zinc-500 transition-colors hover:text-zinc-900"
+        >
+          ← Volver al dashboard
+        </Link>
+
+        <h1 className="mt-4 text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
           Bienvenido, {empresaNombre}
         </h1>
         <p className="mt-2 text-zinc-600">
@@ -159,6 +167,13 @@ export default function PortalEmpresaPage() {
           >
             O selecciona archivos
           </button>
+
+          <Link
+            href="/subir"
+            className="mt-6 rounded-lg bg-green-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2"
+          >
+            Subir facturas al contador
+          </Link>
         </div>
 
         <section className="mt-10">
