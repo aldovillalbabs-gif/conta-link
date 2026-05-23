@@ -105,14 +105,9 @@ export default async function AdminContadorPage({ params }: PageProps) {
 
         <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
-                Clientes — {contadorInfo?.nombre ?? "Contador"}
-              </h1>
-              <span className="rounded-full border border-zinc-300 bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700">
-                Solo lectura
-              </span>
-            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
+              Clientes — {contadorInfo?.nombre ?? "Contador"}
+            </h1>
             <p className="mt-2 text-sm text-zinc-500">
               {contadorInfo?.email ?? "—"}
             </p>
@@ -167,12 +162,20 @@ export default async function AdminContadorPage({ params }: PageProps) {
                       </span>
                     </td>
                     <td className="px-4 py-4 text-right">
-                      <Link
-                        href={`/admin/${contadorId}/${cliente.id}`}
-                        className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-900 transition-colors hover:bg-zinc-50"
-                      >
-                        Ver facturas
-                      </Link>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <Link
+                          href={`/subir?clienteId=${cliente.id}`}
+                          className="rounded-lg bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-zinc-800"
+                        >
+                          Subir facturas
+                        </Link>
+                        <Link
+                          href={`/admin/${contadorId}/${cliente.id}`}
+                          className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-900 transition-colors hover:bg-zinc-50"
+                        >
+                          Ver facturas
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))}

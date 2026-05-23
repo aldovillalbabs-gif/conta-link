@@ -1,8 +1,10 @@
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
-import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import NavContador from "@/components/NavContador";
+import { listarClientesAccesibles } from "@/lib/clientes-acceso";
 
 const PASOS = [
   "Selecciona los documentos",
@@ -137,6 +139,25 @@ function getMensajeDescarga(formatoId: string): string {
 }
 
 export default function ExportarPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-zinc-50">
+          <NavContador />
+          <main className="mx-auto max-w-5xl px-6 py-10 sm:px-10">
+            <p className="text-sm text-zinc-500">Cargando...</p>
+          </main>
+        </div>
+      }
+    >
+      <ExportarPageContent />
+    </Suspense>
+  );
+}
+
+function ExportarPageContent() {
+  const searchParams = useSearchParams();
+  const clienteIdParam = searchParams.get("clienteId");
   const [paso, setPaso] = useState(0);
   const [formatoSeleccionado, setFormatoSeleccionado] = useState("contpaqi");
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -161,22 +182,22 @@ export default function ExportarPage() {
         return;
       }
 
-      const { data } = await supabase
-        .from("clientes")
-        .select("id, nombre, rfc")
-        .eq("contador_id", user.id)
-        .order("nombre", { ascending: true });
-
-      const lista = (data ?? []) as Cliente[];
+      const lista = await listarClientesAccesibles(supabase, user.id);
       setClientes(lista);
-      if (lista.length > 0) {
+
+      if (
+        clienteIdParam &&
+        lista.some((cliente) => cliente.id === clienteIdParam)
+      ) {
+        setClienteId(clienteIdParam);
+      } else if (lista.length > 0) {
         setClienteId((prev) => prev || lista[0].id);
       }
       setLoadingClientes(false);
     }
 
     void cargarClientes();
-  }, []);
+  }, [clienteIdParam]);
 
   useEffect(() => {
     async function cargarFacturas() {

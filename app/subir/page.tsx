@@ -2,8 +2,10 @@
 
 import { createBrowserClient } from "@supabase/ssr";
 import Link from "next/link";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useId, useRef, useState } from "react";
 import NavContador from "@/components/NavContador";
+import { listarClientesAccesibles } from "@/lib/clientes-acceso";
 
 const CFDI_NS = "http://www.sat.gob.mx/cfd/4";
 const TIMBRE_NS = "http://www.sat.gob.mx/TimbreFiscalDigital";
@@ -231,6 +233,25 @@ function isXmlFile(file: File): boolean {
 }
 
 export default function SubirPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-zinc-50">
+          <NavContador />
+          <main className="mx-auto max-w-6xl px-6 py-10 sm:px-10">
+            <p className="text-sm text-zinc-500">Cargando...</p>
+          </main>
+        </div>
+      }
+    >
+      <SubirPageContent />
+    </Suspense>
+  );
+}
+
+function SubirPageContent() {
+  const searchParams = useSearchParams();
+  const clienteIdParam = searchParams.get("clienteId");
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [clientes, setClientes] = useState<ClienteOption[]>([]);
@@ -248,21 +269,21 @@ export default function SubirPage() {
 
       if (!user) return;
 
-      const { data } = await supabase
-        .from("clientes")
-        .select("id, nombre")
-        .eq("contador_id", user.id)
-        .order("nombre", { ascending: true });
-
-      const lista = data ?? [];
+      const lista = await listarClientesAccesibles(supabase, user.id);
       setClientes(lista);
-      if (lista.length > 0) {
+
+      if (
+        clienteIdParam &&
+        lista.some((cliente) => cliente.id === clienteIdParam)
+      ) {
+        setClienteId(clienteIdParam);
+      } else if (lista.length > 0) {
         setClienteId((prev) => prev || lista[0].id);
       }
     }
 
     void cargarClientes();
-  }, []);
+  }, [clienteIdParam]);
 
   const actualizarCuentaContable = useCallback(
     (rowId: string, cuentaContable: string) => {

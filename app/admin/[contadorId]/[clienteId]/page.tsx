@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import DescargarReportePdf from "@/app/facturas/[clienteId]/DescargarReportePdf";
 import FacturasClienteTable from "@/app/facturas/[clienteId]/FacturasClienteTable";
+import PortalLinkActions from "@/app/facturas/[clienteId]/PortalLinkActions";
 import NavContador from "@/components/NavContador";
 import { getContadorProfile } from "@/lib/contadores";
 import { createClient } from "@/lib/supabase-server";
@@ -14,6 +16,8 @@ type Cliente = {
   nombre: string;
   rfc: string | null;
   contador_id: string;
+  slug: string;
+  token: string | null;
 };
 
 export default async function AdminClienteFacturasPage({ params }: PageProps) {
@@ -53,7 +57,7 @@ export default async function AdminClienteFacturasPage({ params }: PageProps) {
 
   const { data: clienteData } = await supabase
     .from("clientes")
-    .select("id, nombre, rfc, contador_id")
+    .select("id, nombre, rfc, contador_id, slug, token")
     .eq("id", clienteId)
     .maybeSingle();
 
@@ -84,24 +88,35 @@ export default async function AdminClienteFacturasPage({ params }: PageProps) {
         </Link>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
-              Facturas — {cliente.nombre}
-            </h1>
-            <span className="rounded-full border border-zinc-300 bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700">
-              Solo lectura
-            </span>
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 sm:text-3xl">
+            Facturas — {cliente.nombre}
+          </h1>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Link
+              href={`/subir?clienteId=${cliente.id}`}
+              className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-50"
+            >
+              Subir facturas
+            </Link>
+            <Link
+              href={`/exportar?clienteId=${cliente.id}`}
+              className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-900 transition-colors hover:bg-zinc-50"
+            >
+              Exportar
+            </Link>
+            <DescargarReportePdf
+              cliente={{ nombre: cliente.nombre, rfc: cliente.rfc }}
+              facturas={facturasData ?? []}
+            />
+            <PortalLinkActions
+              clienteId={cliente.id}
+              slug={cliente.slug}
+              initialToken={cliente.token}
+            />
           </div>
         </div>
 
-        <p className="mt-2 text-sm text-zinc-500">
-          Vista de administrador. No puedes aprobar ni eliminar facturas.
-        </p>
-
-        <FacturasClienteTable
-          facturasIniciales={facturasData ?? []}
-          readOnly
-        />
+        <FacturasClienteTable facturasIniciales={facturasData ?? []} />
       </main>
     </div>
   );
