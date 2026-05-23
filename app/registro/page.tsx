@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, Suspense, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-export default function RegistroPage() {
+function RegistroForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const invitacion = searchParams.get("invitacion");
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,133 +37,164 @@ export default function RegistroPage() {
       },
     });
 
-    setLoading(false);
-
     if (signUpError) {
+      setLoading(false);
       setError(signUpError.message);
       return;
     }
 
+    if (invitacion) {
+      const response = await fetch("/api/despacho/unirse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: invitacion }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json()) as { error?: string };
+        setLoading(false);
+        setError(payload.error ?? "No se pudo unir al despacho.");
+        return;
+      }
+    }
+
+    setLoading(false);
     router.push("/dashboard");
     router.refresh();
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-12">
-      <div className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-8 shadow-sm">
-        <div className="text-center">
-          <Link
-            href="/"
-            className="text-sm font-semibold tracking-[0.2em] text-zinc-900"
-          >
-            CONTALINK
-          </Link>
-          <h1 className="mt-6 text-2xl font-bold tracking-tight text-zinc-900">
-            Crear cuenta
-          </h1>
-          <p className="mt-2 text-sm text-zinc-500">
-            Regístrate para empezar a usar ContaLink
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-          <div>
-            <label
-              htmlFor="nombre"
-              className="block text-sm font-medium text-zinc-900"
-            >
-              Nombre completo
-            </label>
-            <input
-              id="nombre"
-              type="text"
-              autoComplete="name"
-              required
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-zinc-200 px-3 py-2.5 text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-zinc-900"
-            >
-              Correo electrónico
-            </label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-zinc-200 px-3 py-2.5 text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-zinc-900"
-            >
-              Contraseña
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="new-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-zinc-200 px-3 py-2.5 text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="confirmPassword"
-              className="block text-sm font-medium text-zinc-900"
-            >
-              Confirmar contraseña
-            </label>
-            <input
-              id="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              required
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-zinc-200 px-3 py-2.5 text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-zinc-900 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {loading ? "Creando cuenta..." : "Crear cuenta"}
-          </button>
-
-          {error && (
-            <p className="text-center text-sm text-red-600" role="alert">
-              {error}
-            </p>
-          )}
-        </form>
-
-        <p className="mt-6 text-center text-sm text-zinc-500">
-          ¿Ya tienes cuenta?{" "}
-          <Link
-            href="/login"
-            className="font-medium text-green-500 hover:text-green-600"
-          >
-            Inicia sesión
-          </Link>
+    <div className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-8 shadow-sm">
+      <div className="text-center">
+        <Link
+          href="/"
+          className="text-sm font-semibold tracking-[0.2em] text-zinc-900"
+        >
+          CONTALINK
+        </Link>
+        <h1 className="mt-6 text-2xl font-bold tracking-tight text-zinc-900">
+          Crear cuenta
+        </h1>
+        <p className="mt-2 text-sm text-zinc-500">
+          {invitacion
+            ? "Te unirás a un despacho contable existente."
+            : "Regístrate para empezar a usar ContaLink"}
         </p>
       </div>
+
+      <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+        <div>
+          <label
+            htmlFor="nombre"
+            className="block text-sm font-medium text-zinc-900"
+          >
+            Nombre completo
+          </label>
+          <input
+            id="nombre"
+            type="text"
+            autoComplete="name"
+            required
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            className="mt-1.5 w-full rounded-lg border border-zinc-200 px-3 py-2.5 text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="email"
+            className="block text-sm font-medium text-zinc-900"
+          >
+            Correo electrónico
+          </label>
+          <input
+            id="email"
+            type="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="mt-1.5 w-full rounded-lg border border-zinc-200 px-3 py-2.5 text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="password"
+            className="block text-sm font-medium text-zinc-900"
+          >
+            Contraseña
+          </label>
+          <input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="mt-1.5 w-full rounded-lg border border-zinc-200 px-3 py-2.5 text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="confirmPassword"
+            className="block text-sm font-medium text-zinc-900"
+          >
+            Confirmar contraseña
+          </label>
+          <input
+            id="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            required
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            className="mt-1.5 w-full rounded-lg border border-zinc-200 px-3 py-2.5 text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full rounded-lg bg-zinc-900 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading ? "Creando cuenta..." : "Crear cuenta"}
+        </button>
+
+        {error && (
+          <p className="text-center text-sm text-red-600" role="alert">
+            {error}
+          </p>
+        )}
+      </form>
+
+      <p className="mt-6 text-center text-sm text-zinc-500">
+        ¿Ya tienes cuenta?{" "}
+        <Link
+          href="/login"
+          className="font-medium text-green-500 hover:text-green-600"
+        >
+          Inicia sesión
+        </Link>
+      </p>
+    </div>
+  );
+}
+
+export default function RegistroPage() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-12">
+      <Suspense
+        fallback={
+          <div className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-8 shadow-sm">
+            <p className="text-center text-sm text-zinc-500">Cargando...</p>
+          </div>
+        }
+      >
+        <RegistroForm />
+      </Suspense>
     </div>
   );
 }

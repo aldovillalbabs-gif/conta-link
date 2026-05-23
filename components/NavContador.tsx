@@ -52,6 +52,14 @@ function IconGear() {
   );
 }
 
+function IconShield() {
+  return (
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
+    </svg>
+  );
+}
+
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: <IconHome /> },
   { href: "/clientes", label: "Clientes", icon: <IconPeople /> },
@@ -78,6 +86,7 @@ export default function NavContador() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [nombreUsuario, setNombreUsuario] = useState("");
+  const [esAdmin, setEsAdmin] = useState(false);
 
   useEffect(() => {
     async function cargarUsuario() {
@@ -98,6 +107,14 @@ export default function NavContador() {
           ? fullName.trim()
           : user.email ?? "",
       );
+
+      const { data: profile } = await supabase
+        .from("contadores")
+        .select("rol")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      setEsAdmin(profile?.rol === "admin");
     }
 
     void cargarUsuario();
@@ -196,6 +213,30 @@ export default function NavContador() {
                 </li>
               );
             })}
+            {esAdmin && (
+              <li>
+                <Link
+                  href="/admin"
+                  onClick={() => setOpen(false)}
+                  className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                    isActive(pathname, "/admin")
+                      ? "bg-zinc-100 text-zinc-900"
+                      : "text-zinc-900 hover:bg-zinc-50"
+                  }`}
+                >
+                  <span
+                    className={
+                      isActive(pathname, "/admin")
+                        ? "text-zinc-900"
+                        : "text-zinc-500"
+                    }
+                  >
+                    <IconShield />
+                  </span>
+                  Despacho
+                </Link>
+              </li>
+            )}
           </ul>
         </nav>
 

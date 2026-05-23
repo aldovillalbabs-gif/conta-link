@@ -21,6 +21,7 @@ type FacturaEditable = FacturaRow & {
 
 type FacturasClienteTableProps = {
   facturasIniciales: FacturaRow[];
+  readOnly?: boolean;
 };
 
 function createSupabaseBrowserClient() {
@@ -58,6 +59,7 @@ function toEditable(factura: FacturaRow): FacturaEditable {
 
 export default function FacturasClienteTable({
   facturasIniciales,
+  readOnly = false,
 }: FacturasClienteTableProps) {
   const [facturas, setFacturas] = useState<FacturaEditable[]>(() =>
     facturasIniciales.map(toEditable),
@@ -167,7 +169,7 @@ export default function FacturasClienteTable({
                 "Total",
                 "Cuenta contable",
                 "Estado",
-                "",
+                ...(readOnly ? [] : [""]),
               ].map((columna, index) => (
                 <th
                   key={columna || `col-${index}`}
@@ -202,14 +204,20 @@ export default function FacturasClienteTable({
                   {formatMoney(Number(row.total))}
                 </td>
                 <td className="px-4 py-3">
-                  <input
-                    type="text"
-                    value={row.cuentaContable}
-                    onChange={(e) =>
-                      updateCuentaContable(row.id, e.target.value)
-                    }
-                    className="w-full min-w-[180px] rounded border border-zinc-200 px-2 py-1.5 text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
-                  />
+                  {readOnly ? (
+                    <span className="text-zinc-900">
+                      {row.cuentaContable.trim() || "—"}
+                    </span>
+                  ) : (
+                    <input
+                      type="text"
+                      value={row.cuentaContable}
+                      onChange={(e) =>
+                        updateCuentaContable(row.id, e.target.value)
+                      }
+                      className="w-full min-w-[180px] rounded border border-zinc-200 px-2 py-1.5 text-zinc-900 focus:border-zinc-900 focus:outline-none focus:ring-1 focus:ring-zinc-900"
+                    />
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap items-center gap-2">
@@ -222,46 +230,51 @@ export default function FacturasClienteTable({
                         <span className="rounded-full border border-zinc-200 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-600">
                           Pendiente
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => void aprobarFactura(row.id)}
-                          disabled={
-                            aprobandoId === row.id || !row.cuentaContable.trim()
-                          }
-                          className="rounded-lg bg-zinc-900 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {aprobandoId === row.id ? "Guardando..." : "Aprobar"}
-                        </button>
+                        {!readOnly && (
+                          <button
+                            type="button"
+                            onClick={() => void aprobarFactura(row.id)}
+                            disabled={
+                              aprobandoId === row.id ||
+                              !row.cuentaContable.trim()
+                            }
+                            className="rounded-lg bg-zinc-900 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {aprobandoId === row.id ? "Guardando..." : "Aprobar"}
+                          </button>
+                        )}
                       </>
                     )}
                   </div>
                 </td>
-                <td className="px-4 py-3 text-right">
-                  <button
-                    type="button"
-                    onClick={() => void eliminarFactura(row.id)}
-                    disabled={eliminandoId === row.id}
-                    aria-label="Eliminar factura"
-                    title="Eliminar"
-                    className="inline-flex rounded p-1 text-zinc-400 transition-colors hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <svg
-                      className="h-4 w-4"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={1.5}
-                      stroke="currentColor"
-                      aria-hidden
+                {!readOnly && (
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => void eliminarFactura(row.id)}
+                      disabled={eliminandoId === row.id}
+                      aria-label="Eliminar factura"
+                      title="Eliminar"
+                      className="inline-flex rounded p-1 text-zinc-400 transition-colors hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
-                      />
-                    </svg>
-                  </button>
-                </td>
+                      <svg
+                        className="h-4 w-4"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={1.5}
+                        stroke="currentColor"
+                        aria-hidden
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
+                        />
+                      </svg>
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
