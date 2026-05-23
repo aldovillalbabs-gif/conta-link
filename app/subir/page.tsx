@@ -6,6 +6,12 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useId, useRef, useState } from "react";
 import NavContador from "@/components/NavContador";
 import { listarClientesAccesibles } from "@/lib/clientes-acceso";
+import {
+  formatMoneyDisplay,
+  isPdfOrImageFile,
+  leerFacturaDesdeArchivo,
+  mapFacturaExtraida,
+} from "@/lib/leer-factura";
 
 const CFDI_NS = "http://www.sat.gob.mx/cfd/4";
 const TIMBRE_NS = "http://www.sat.gob.mx/TimbreFiscalDigital";
@@ -259,6 +265,7 @@ function SubirPageContent() {
   const [facturas, setFacturas] = useState<FacturaRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [leyendoDocumento, setLeyendoDocumento] = useState(false);
 
   useEffect(() => {
     async function cargarClientes() {
@@ -333,9 +340,20 @@ function SubirPageContent() {
   );
 
   const processFiles = useCallback(async (files: FileList | File[]) => {
-    const xmlFiles = Array.from(files).filter(isXmlFile);
-    if (xmlFiles.length === 0) {
-      setError("Solo se permiten archivos XML.");
+    const fileList = Array.from(files);
+    const xmlFiles = fileList.filter(isXmlFile);
+    const documentFiles = fileList.filter(isPdfOrImageFile);
+    const unsupported = fileList.filter(
+      (file) => !isXmlFile(file) && !isPdfOrImageFile(file),
+    );
+
+    if (unsupported.length > 0 && xmlFiles.length === 0 && documentFiles.length === 0) {
+      setError("Solo se permiten archivos XML, PDF, JPG o PNG.");
+      return;
+    }
+
+    if (xmlFiles.length === 0 && documentFiles.length === 0) {
+      setError("Solo se permiten archivos XML, PDF, JPG o PNG.");
       return;
     }
 
@@ -393,6 +411,67 @@ function SubirPageContent() {
         );
       }
     }
+
+    if (documentFiles.length > 0) {
+      setLeyendoDocumento(true);
+      setError(null);
+    }
+
+    for (const file of documentFiles) {
+      try {
+        const extraida = await leerFacturaDesdeArchivo(file);
+        const parsed = mapFacturaExtraida(extraida);
+        const row: FacturaRow = {
+          id: crypto.randomUUID(),
+          proveedor: parsed.proveedor,
+          concepto: parsed.concepto,
+          rfc: parsed.rfc,
+          fecha: parsed.fecha,
+          uuid: parsed.uuid,
+          subtotal: formatMoneyDisplay(parsed.subtotal),
+          iva: formatMoneyDisplay(parsed.iva),
+          total: formatMoneyDisplay(parsed.total),
+          cuentaContable: "",
+        };
+
+        const { id: facturaDbId, error: saveError } = await guardarFactura({
+          cliente_id: clienteId,
+          proveedor: parsed.proveedor,
+          rfc_emisor: parsed.rfc,
+          fecha: parsed.fecha,
+          subtotal: parsed.subtotal,
+          iva: parsed.iva,
+          total: parsed.total,
+          uuid_cfdi: parsed.uuid,
+          cuenta_contable: "",
+        });
+
+        if (saveError) {
+          errors.push(
+            documentFiles.length > 1
+              ? `${file.name}: ${saveError.message}`
+              : saveError.message,
+          );
+          continue;
+        }
+
+        if (facturaDbId) {
+          row.facturaDbId = facturaDbId;
+        }
+
+        newRows.push(row);
+      } catch (err) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : "No se pudo leer el documento. Intenta con una imagen más clara.";
+        errors.push(
+          documentFiles.length > 1 ? `${file.name}: ${message}` : message,
+        );
+      }
+    }
+
+    setLeyendoDocumento(false);
 
     if (newRows.length > 0) {
       setFacturas((prev) => [...prev, ...newRows]);
@@ -530,14 +609,19 @@ function SubirPageContent() {
               />
             </svg>
             <p className="mt-4 text-center text-sm font-medium text-zinc-600">
-              Arrastra tus archivos XML aquí
+              Arrastra tus archivos XML, PDF o imágenes aquí
             </p>
+            {leyendoDocumento && (
+              <p className="mt-2 text-center text-sm font-medium text-zinc-900">
+                Leyendo documento con IA...
+              </p>
+            )}
           </div>
 
           <input
             ref={inputRef}
             type="file"
-            accept=".xml,application/xml,text/xml"
+            accept=".xml,.pdf,application/xml,text/xml,application/pdf,image/jpeg,image/png,image/jpg"
             className="sr-only"
             id={inputId}
             multiple
@@ -546,9 +630,10 @@ function SubirPageContent() {
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="mt-4 rounded-lg border border-zinc-300 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2"
+            disabled={leyendoDocumento}
+            className="mt-4 rounded-lg border border-zinc-300 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
           >
-            O selecciona archivos
+            {leyendoDocumento ? "Leyendo documento con IA..." : "O selecciona archivos"}
           </button>
 
           {error && (

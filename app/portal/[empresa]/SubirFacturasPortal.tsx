@@ -3,12 +3,17 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  isPdfOrImageFile,
+  leerFacturaDesdeArchivo,
+  mapFacturaExtraida,
+} from "@/lib/leer-factura";
 
 const CFDI_NS = "http://www.sat.gob.mx/cfd/4";
 const TIMBRE_NS = "http://www.sat.gob.mx/TimbreFiscalDigital";
 
 const ACCEPT_FILES =
-  ".xml,.pdf,application/xml,text/xml,application/pdf,image/jpeg,image/png,image/webp,image/gif,image/heic";
+  ".xml,.pdf,application/xml,text/xml,application/pdf,image/jpeg,image/png,image/jpg";
 
 type SubirFacturasPortalProps = {
   clienteId: string;
@@ -231,6 +236,7 @@ export function SubirFacturasPortal({
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [leyendoDocumento, setLeyendoDocumento] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSuccessBanner, setShowSuccessBanner] = useState(false);
 
@@ -250,84 +256,83 @@ export function SubirFacturasPortal({
       if (fileList.length === 0) return;
 
       const xmlFiles = fileList.filter(isXmlFile);
-      const nonXmlFiles = fileList.filter((file) => !isXmlFile(file));
+      const documentFiles = fileList.filter(isPdfOrImageFile);
+      const unsupported = fileList.filter(
+        (file) => !isXmlFile(file) && !isPdfOrImageFile(file),
+      );
 
-      if (nonXmlFiles.length > 0) {
-        setError("Solo XMLs por ahora");
-        if (xmlFiles.length === 0) return;
-      } else {
-        setError(null);
+      if (unsupported.length > 0 && xmlFiles.length === 0 && documentFiles.length === 0) {
+        setError("Solo se permiten archivos XML, PDF, JPG o PNG.");
+        return;
+      }
+
+      if (xmlFiles.length === 0 && documentFiles.length === 0) {
+        setError("Solo se permiten archivos XML, PDF, JPG o PNG.");
+        return;
       }
 
       setShowSuccessBanner(false);
       setIsUploading(true);
+      setError(null);
 
       const supabase = createSupabaseBrowserClient();
       const errors: string[] = [];
       let uploadedCount = 0;
 
+      const guardarFacturaPortal = async (parsed: ParsedCfdi) => {
+        const { data: inserted, error: insertError } = await supabase
+          .from("facturas")
+          .insert({
+            cliente_id: clienteId,
+            proveedor: parsed.proveedor,
+            rfc_emisor: parsed.rfc,
+            fecha: parsed.fecha,
+            subtotal: parsed.subtotal,
+            iva: parsed.iva,
+            total: parsed.total,
+            uuid_cfdi: parsed.uuid,
+            cuenta_contable: "",
+          })
+          .select("id")
+          .single();
+
+        if (insertError) {
+          throw new Error(insertError.message);
+        }
+
+        const cuentaContable = await solicitarCuentaContable(
+          parsed.proveedor,
+          parsed.concepto,
+        );
+
+        if (inserted?.id && cuentaContable) {
+          const { error: updateError } = await supabase
+            .from("facturas")
+            .update({ cuenta_contable: cuentaContable })
+            .eq("id", inserted.id);
+
+          if (updateError) {
+            throw new Error(updateError.message);
+          }
+        }
+
+        if (contadorEmail) {
+          notificarContador({
+            contadorEmail,
+            contadorNombre: contadorNombre ?? contadorEmail,
+            clienteNombre,
+            proveedorFactura: parsed.proveedor,
+            montoTotal: parsed.total,
+          });
+        }
+      };
+
       for (const file of xmlFiles) {
         try {
           const xml = await file.text();
           const parsed = parseCfdiXml(xml);
-
-          const { data: inserted, error: insertError } = await supabase
-            .from("facturas")
-            .insert({
-              cliente_id: clienteId,
-              proveedor: parsed.proveedor,
-              rfc_emisor: parsed.rfc,
-              fecha: parsed.fecha,
-              subtotal: parsed.subtotal,
-              iva: parsed.iva,
-              total: parsed.total,
-              uuid_cfdi: parsed.uuid,
-              cuenta_contable: "",
-            })
-            .select("id")
-            .single();
-
-          if (insertError) {
-            errors.push(
-              xmlFiles.length > 1
-                ? `${file.name}: ${insertError.message}`
-                : insertError.message,
-            );
-            continue;
-          }
-
-          const cuentaContable = await solicitarCuentaContable(
-            parsed.proveedor,
-            parsed.concepto,
-          );
-
-          if (inserted?.id && cuentaContable) {
-            const { error: updateError } = await supabase
-              .from("facturas")
-              .update({ cuenta_contable: cuentaContable })
-              .eq("id", inserted.id);
-
-            if (updateError) {
-              errors.push(
-                xmlFiles.length > 1
-                  ? `${file.name}: ${updateError.message}`
-                  : updateError.message,
-              );
-              continue;
-            }
-          }
-
+          await guardarFacturaPortal(parsed);
           uploadedCount += 1;
-
-          if (contadorEmail) {
-            notificarContador({
-              contadorEmail,
-              contadorNombre: contadorNombre ?? contadorEmail,
-              clienteNombre,
-              proveedorFactura: parsed.proveedor,
-              montoTotal: parsed.total,
-            });
-          }
         } catch (err) {
           const message =
             err instanceof Error
@@ -339,6 +344,38 @@ export function SubirFacturasPortal({
         }
       }
 
+      if (documentFiles.length > 0) {
+        setLeyendoDocumento(true);
+      }
+
+      for (const file of documentFiles) {
+        try {
+          const extraida = await leerFacturaDesdeArchivo(file);
+          const mapped = mapFacturaExtraida(extraida);
+          const parsed: ParsedCfdi = {
+            proveedor: mapped.proveedor,
+            concepto: mapped.concepto,
+            rfc: mapped.rfc,
+            fecha: mapped.fecha,
+            uuid: mapped.uuid,
+            subtotal: mapped.subtotal,
+            iva: mapped.iva,
+            total: mapped.total,
+          };
+          await guardarFacturaPortal(parsed);
+          uploadedCount += 1;
+        } catch (err) {
+          const message =
+            err instanceof Error
+              ? err.message
+              : "No se pudo leer el documento. Intenta con una imagen más clara.";
+          errors.push(
+            documentFiles.length > 1 ? `${file.name}: ${message}` : message,
+          );
+        }
+      }
+
+      setLeyendoDocumento(false);
       setIsUploading(false);
 
       if (uploadedCount > 0) {
@@ -409,6 +446,11 @@ export function SubirFacturasPortal({
         <p className="mt-2 text-center text-xs text-zinc-500">
           Acepta XML, PDF e imágenes
         </p>
+        {leyendoDocumento && (
+          <p className="mt-2 text-center text-sm font-medium text-zinc-900">
+            Leyendo documento con IA...
+          </p>
+        )}
       </div>
 
       {showSuccessBanner && (
@@ -436,7 +478,11 @@ export function SubirFacturasPortal({
         disabled={isUploading}
         className="mt-4 rounded-lg border border-zinc-300 bg-white px-5 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
       >
-        {isUploading ? "Subiendo..." : "O selecciona archivos"}
+        {isUploading
+          ? leyendoDocumento
+            ? "Leyendo documento con IA..."
+            : "Subiendo..."
+          : "O selecciona archivos"}
       </button>
 
       {error && (
