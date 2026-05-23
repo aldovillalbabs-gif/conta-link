@@ -5,6 +5,13 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import NavContador from "@/components/NavContador";
 import { listarClientesAccesibles } from "@/lib/clientes-acceso";
+import {
+  descargarBlob,
+  generarExportacion,
+  type ClienteExport,
+  type FacturaExport,
+  type FormatoExportId,
+} from "@/lib/exportar-facturas";
 
 const PASOS = [
   "Selecciona los documentos",
@@ -13,28 +20,45 @@ const PASOS = [
   "¡Archivo generado!",
 ] as const;
 
-const formatos = [
-  { id: "contpaqi", nombre: "CONTPAQi", descripcion: "Layout .txt para importación directa" },
-  { id: "aspel", nombre: "Aspel COI", descripcion: "Formato compatible Aspel" },
-  { id: "xml", nombre: "XML SAT", descripcion: "Exportación fiscal XML" },
-  { id: "excel", nombre: "Excel genérico", descripcion: "Hoja de cálculo estándar" },
-] as const;
-
-type Cliente = {
-  id: string;
+const formatos: Array<{
+  id: FormatoExportId;
   nombre: string;
-  rfc: string | null;
-};
+  descripcion: string;
+}> = [
+  {
+    id: "quickbooks",
+    nombre: "QuickBooks",
+    descripcion: "CSV para importar en QuickBooks",
+  },
+  {
+    id: "contpaqi",
+    nombre: "CONTPAQi",
+    descripcion: "Layout .txt para importación directa",
+  },
+  {
+    id: "aspel",
+    nombre: "Aspel COI",
+    descripcion: "Formato compatible Aspel",
+  },
+  {
+    id: "xml",
+    nombre: "XML SAT",
+    descripcion: "Anexo 24 — Pólizas SAT v1.3",
+  },
+  {
+    id: "excel",
+    nombre: "Excel genérico",
+    descripcion: "Hoja de cálculo estándar (.xlsx)",
+  },
+];
 
-type Factura = {
-  id: string;
-  proveedor: string;
-  rfc_emisor: string | null;
-  subtotal: number;
-  iva: number;
+type ExportResumen = {
+  cliente: ClienteExport;
+  cantidadMovimientos: number;
   total: number;
-  cuenta_contable: string | null;
-  uuid_cfdi: string | null;
+  formatoId: FormatoExportId;
+  filename: string;
+  blob: Blob;
 };
 
 function createSupabaseBrowserClient() {
@@ -72,44 +96,10 @@ function getPeriodoActual(): string {
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
-const TIPO_EXPORTACION: Record<string, string> = {
-  contpaqi: "CONTPAQi",
-  aspel: "AspelCOI",
-  xml: "XMLSAT",
-  excel: "Excel",
-};
-
-type ExportResumen = {
-  cliente: Cliente;
-  cantidadMovimientos: number;
-  total: number;
-  formatoId: string;
-};
-
-function sanitizeNombreArchivo(nombre: string): string {
-  const sanitized = nombre
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9]/g, "");
-
-  return sanitized || "Cliente";
-}
-
-function getMesAnioArchivo(): string {
-  const now = new Date();
-  const mes = now.toLocaleDateString("es-MX", { month: "long" });
-  const mesCapitalizado = mes.charAt(0).toUpperCase() + mes.slice(1);
-  return `${mesCapitalizado}${now.getFullYear()}`;
-}
-
-function generarNombreArchivo(clienteNombre: string, formatoId: string): string {
-  const nombreCliente = sanitizeNombreArchivo(clienteNombre);
-  const tipoExportacion = TIPO_EXPORTACION[formatoId] ?? "Export";
-  return `${nombreCliente}_${tipoExportacion}_${getMesAnioArchivo()}.xlsx`;
-}
-
-function getMensajeFormato(formatoId: string): string {
+function getMensajeFormato(formatoId: FormatoExportId): string {
   switch (formatoId) {
+    case "quickbooks":
+      return "Listo para importarse en QuickBooks";
     case "contpaqi":
       return "Listo para importarse en CONTPAQi sin modificaciones";
     case "aspel":
@@ -120,21 +110,6 @@ function getMensajeFormato(formatoId: string): string {
       return "Listo para importarse en tu sistema contable";
     default:
       return "Listo para importarse en tu sistema contable";
-  }
-}
-
-function getMensajeDescarga(formatoId: string): string {
-  switch (formatoId) {
-    case "contpaqi":
-      return "Archivo descargado. Importa este archivo en CONTPAQi para completar el proceso.";
-    case "aspel":
-      return "Archivo descargado. Importa este archivo en Aspel COI para completar el proceso.";
-    case "xml":
-      return "Archivo descargado. Envía este archivo al SAT para completar el proceso.";
-    case "excel":
-      return "Archivo descargado. Importa este archivo en tu sistema contable para completar el proceso.";
-    default:
-      return "Archivo descargado.";
   }
 }
 
@@ -159,14 +134,19 @@ function ExportarPageContent() {
   const searchParams = useSearchParams();
   const clienteIdParam = searchParams.get("clienteId");
   const [paso, setPaso] = useState(0);
-  const [formatoSeleccionado, setFormatoSeleccionado] = useState("contpaqi");
-  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [formatoSeleccionado, setFormatoSeleccionado] =
+    useState<FormatoExportId>("excel");
+  const [clientes, setClientes] = useState<ClienteExport[]>([]);
   const [clienteId, setClienteId] = useState("");
-  const [facturas, setFacturas] = useState<Factura[]>([]);
+  const [facturas, setFacturas] = useState<FacturaExport[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [loadingClientes, setLoadingClientes] = useState(true);
   const [loadingFacturas, setLoadingFacturas] = useState(false);
-  const [exportResumen, setExportResumen] = useState<ExportResumen | null>(null);
+  const [exportResumen, setExportResumen] = useState<ExportResumen | null>(
+    null,
+  );
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [generando, setGenerando] = useState(false);
 
   useEffect(() => {
     async function cargarClientes() {
@@ -212,12 +192,12 @@ function ExportarPageContent() {
       const { data } = await supabase
         .from("facturas")
         .select(
-          "id, proveedor, rfc_emisor, subtotal, iva, total, cuenta_contable, uuid_cfdi",
+          "id, proveedor, rfc_emisor, fecha, subtotal, iva, total, cuenta_contable, uuid_cfdi",
         )
         .eq("cliente_id", clienteId)
         .order("created_at", { ascending: false });
 
-      const lista = (data ?? []) as Factura[];
+      const lista = (data ?? []) as FacturaExport[];
       setFacturas(lista);
       setSelectedIds(new Set(lista.map((factura) => factura.id)));
       setLoadingFacturas(false);
@@ -272,28 +252,42 @@ function ExportarPageContent() {
     });
   };
 
-  const generarExportacion = () => {
+  const handleGenerarDescarga = () => {
     if (!clienteSeleccionado) return;
+
+    setExportError(null);
+    setGenerando(true);
+
+    const resultado = generarExportacion(
+      clienteSeleccionado,
+      facturasSeleccionadas,
+      formatoSeleccionado,
+    );
+
+    setGenerando(false);
+
+    if (!resultado.ok) {
+      setExportError(resultado.message);
+      return;
+    }
+
+    descargarBlob(resultado.blob, resultado.filename);
 
     setExportResumen({
       cliente: clienteSeleccionado,
       cantidadMovimientos: facturasSeleccionadas.length,
       total: totales.total,
       formatoId: formatoSeleccionado,
+      filename: resultado.filename,
+      blob: resultado.blob,
     });
     setPaso(3);
   };
 
-  const resumenPaso4: ExportResumen | null =
-    exportResumen ??
-    (clienteSeleccionado
-      ? {
-          cliente: clienteSeleccionado,
-          cantidadMovimientos: facturasSeleccionadas.length,
-          total: totales.total,
-          formatoId: formatoSeleccionado,
-        }
-      : null);
+  const handleRedescargar = () => {
+    if (!exportResumen) return;
+    descargarBlob(exportResumen.blob, exportResumen.filename);
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -308,7 +302,10 @@ function ExportarPageContent() {
             <button
               key={PASOS[index]}
               type="button"
-              onClick={() => setPaso(index)}
+              onClick={() => {
+                if (index === 3 && !exportResumen) return;
+                setPaso(index);
+              }}
               aria-label={`Paso ${index + 1}: ${PASOS[index]}`}
               aria-current={paso === index ? "step" : undefined}
               className={`h-2.5 rounded-full transition-all ${
@@ -501,7 +498,10 @@ function ExportarPageContent() {
                 <button
                   key={formato.id}
                   type="button"
-                  onClick={() => setFormatoSeleccionado(formato.id)}
+                  onClick={() => {
+                    setFormatoSeleccionado(formato.id);
+                    setExportError(null);
+                  }}
                   className={`rounded-lg border p-4 text-left transition-colors ${
                     formatoSeleccionado === formato.id
                       ? "border-green-600 bg-green-50/50 ring-1 ring-green-600"
@@ -568,6 +568,15 @@ function ExportarPageContent() {
               </div>
             </div>
 
+            {exportError && (
+              <p
+                className="mt-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                role="alert"
+              >
+                {exportError}
+              </p>
+            )}
+
             <div className="mt-8 flex flex-wrap gap-3">
               <button
                 type="button"
@@ -578,17 +587,21 @@ function ExportarPageContent() {
               </button>
               <button
                 type="button"
-                onClick={generarExportacion}
-                disabled={!clienteSeleccionado || facturasSeleccionadas.length === 0}
+                onClick={handleGenerarDescarga}
+                disabled={
+                  !clienteSeleccionado ||
+                  facturasSeleccionadas.length === 0 ||
+                  generando
+                }
                 className="rounded-lg bg-green-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Generar y descargar archivo →
+                {generando ? "Generando..." : "Generar y descargar archivo →"}
               </button>
             </div>
           </section>
         )}
 
-        {paso === 3 && resumenPaso4 && (
+        {paso === 3 && exportResumen && (
           <section className="text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
               <svg
@@ -612,25 +625,21 @@ function ExportarPageContent() {
               Paso 4 — ¡Archivo generado!
             </h1>
             <p className="mt-2 text-lg font-medium text-zinc-900">
-              {resumenPaso4.cliente.nombre}
+              {exportResumen.cliente.nombre}
             </p>
             <p className="mt-1 text-base text-zinc-700">
               Archivo generado exitosamente
             </p>
             <p className="mt-1 text-zinc-600">
-              {getMensajeFormato(resumenPaso4.formatoId)}
+              {getMensajeFormato(exportResumen.formatoId)}
             </p>
 
             <ul className="mx-auto mt-8 max-w-md space-y-2 text-left text-sm text-zinc-700">
               {[
-                generarNombreArchivo(
-                  resumenPaso4.cliente.nombre,
-                  resumenPaso4.formatoId,
-                ),
-                `${resumenPaso4.cantidadMovimientos} movimientos · ${formatMoney(resumenPaso4.total)} MXN`,
+                exportResumen.filename,
+                `${exportResumen.cantidadMovimientos} movimientos · ${formatMoney(exportResumen.total)} MXN`,
                 "Partida doble cuadrada",
                 "UUIDs de CFDI incluidos",
-                "Guardado en historial",
               ].map((item) => (
                 <li key={item} className="flex items-center gap-2">
                   <span className="text-green-600" aria-hidden>
@@ -644,9 +653,7 @@ function ExportarPageContent() {
             <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row">
               <button
                 type="button"
-                onClick={() =>
-                  alert(getMensajeDescarga(resumenPaso4.formatoId))
-                }
+                onClick={handleRedescargar}
                 className="rounded-lg bg-green-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-green-700"
               >
                 Descargar archivo
@@ -655,6 +662,7 @@ function ExportarPageContent() {
                 type="button"
                 onClick={() => {
                   setExportResumen(null);
+                  setExportError(null);
                   setPaso(0);
                 }}
                 className="rounded-lg border border-zinc-300 px-6 py-3 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50"
